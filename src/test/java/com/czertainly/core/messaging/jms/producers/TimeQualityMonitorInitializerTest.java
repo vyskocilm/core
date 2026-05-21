@@ -2,7 +2,6 @@ package com.czertainly.core.messaging.jms.producers;
 
 import com.czertainly.core.dao.entity.signing.TimeQualityConfiguration;
 import com.czertainly.core.dao.repository.signing.TimeQualityConfigurationRepository;
-import com.czertainly.core.messaging.model.TimeQualityConfigChangedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,15 +29,15 @@ class TimeQualityMonitorInitializerTest {
 
         initializer.onApplicationReady();
 
-        verify(producer).publishSnapshot(List.of(config));
+        verify(producer).publishSnapshot(List.of(config), null);
     }
 
     @Test
     void onConfigChanged_republishesSnapshot() {
         when(repository.findAll()).thenReturn(List.of());
 
-        initializer.onConfigChanged(new TimeQualityConfigChangedEvent(this));
+        initializer.onConfigChanged();
 
-        verify(producer).publishSnapshot(List.of());
+        verify(producer).publishSnapshot(List.of(), null);
     }
 }

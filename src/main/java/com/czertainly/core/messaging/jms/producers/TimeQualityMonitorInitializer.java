@@ -21,11 +21,11 @@ public class TimeQualityMonitorInitializer {
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         log.info("Broadcasting initial time quality configuration snapshot to Monitor");
-        timeQualityConfigurationProducer.publishSnapshot(timeQualityConfigurationRepository.findAll());
+        timeQualityConfigurationProducer.publishSnapshot(timeQualityConfigurationRepository.findAll(), null);
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onConfigChanged(TimeQualityConfigChangedEvent event) {
-        timeQualityConfigurationProducer.publishSnapshot(timeQualityConfigurationRepository.findAll());
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, classes = TimeQualityConfigChangedEvent.class)
+    public void onConfigChanged() {
+        timeQualityConfigurationProducer.publishSnapshot(timeQualityConfigurationRepository.findAll(), null);
     }
 }

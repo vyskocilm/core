@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,20 +31,26 @@ class TimeQualityConfigRequestListenerTest {
         config.setName("my-profile");
         when(repository.findAll()).thenReturn(List.of(config));
 
+        UUID correlationId = UUID.randomUUID();
         TimeQualityConfigRequest request = new TimeQualityConfigRequest();
+        request.setCorrelationId(correlationId);
         request.setRequestedAt(Instant.now());
 
         listener.processMessage(request);
 
-        verify(producer).publishSnapshot(List.of(config));
+        verify(producer).publishSnapshot(List.of(config), correlationId);
     }
 
     @Test
     void processMessage_withEmptyDb_publishesEmptySnapshot() {
         when(repository.findAll()).thenReturn(List.of());
 
-        listener.processMessage(new TimeQualityConfigRequest());
+        TimeQualityConfigRequest request = new TimeQualityConfigRequest();
+        request.setCorrelationId(null);
+        request.setRequestedAt(Instant.now());
 
-        verify(producer).publishSnapshot(List.of());
+        listener.processMessage(request);
+
+        verify(producer).publishSnapshot(List.of(), null);
     }
 }

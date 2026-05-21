@@ -39,7 +39,7 @@ class TimeQualityConfigurationProducerTest {
     void publishSnapshot_sendsMessageWithAllConfigurations() {
         TimeQualityConfiguration config = buildConfig("profile-a");
 
-        producer.publishSnapshot(List.of(config));
+        producer.publishSnapshot(List.of(config), null);
 
         ArgumentCaptor<Object> messageCaptor = ArgumentCaptor.forClass(Object.class);
         verify(jmsTemplate).convertAndSend(
@@ -51,11 +51,12 @@ class TimeQualityConfigurationProducerTest {
         assertThat(sent.getConfigurations()).hasSize(1);
         assertThat(sent.getConfigurations().get(0).getId()).isEqualTo(config.getUuid());
         assertThat(sent.getGeneratedAt()).isNotNull();
+        assertThat(sent.getCorrelationId()).isNull();
     }
 
     @Test
     void publishSnapshot_withEmptyList_sendsEmptySnapshot() {
-        producer.publishSnapshot(List.of());
+        producer.publishSnapshot(List.of(), null);
 
         ArgumentCaptor<Object> messageCaptor = ArgumentCaptor.forClass(Object.class);
         verify(jmsTemplate).convertAndSend(anyString(), messageCaptor.capture(), any(MessagePostProcessor.class));

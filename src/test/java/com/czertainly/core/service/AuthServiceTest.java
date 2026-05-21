@@ -43,7 +43,7 @@ class AuthServiceTest extends BaseSpringBootTest {
     private WireMockServer mockServer;
 
     @Autowired
-    private AuthService authService;
+    private AuthExternalService authService;
 
     @Autowired
     private ContextRefreshListener contextRefreshListener;

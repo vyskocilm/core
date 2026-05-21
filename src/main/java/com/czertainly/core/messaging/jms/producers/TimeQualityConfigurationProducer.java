@@ -1,7 +1,7 @@
 package com.czertainly.core.messaging.jms.producers;
 
-import com.czertainly.api.model.messaging.timequality.TimeQualityConfigSnapshot;
 import com.czertainly.api.model.messaging.timequality.TimeQualityConfig;
+import com.czertainly.api.model.messaging.timequality.TimeQualityConfigSnapshot;
 import com.czertainly.core.dao.entity.signing.TimeQualityConfiguration;
 import com.czertainly.core.messaging.jms.configuration.MessagingProperties;
 import lombok.AllArgsConstructor;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
+import java.util.UUID;
 
 @Component
 @AllArgsConstructor
@@ -23,8 +23,9 @@ public class TimeQualityConfigurationProducer {
     private final MessagingProperties messagingProperties;
     private final RetryTemplate producerRetryTemplate;
 
-    public void publishSnapshot(List<TimeQualityConfiguration> configurations) {
+    public void publishSnapshot(List<TimeQualityConfiguration> configurations, UUID correlationId) {
         TimeQualityConfigSnapshot message = new TimeQualityConfigSnapshot();
+        message.setCorrelationId(correlationId);
         message.setGeneratedAt(Instant.now());
         message.setConfigurations(configurations.stream().map(this::toMessage).toList());
         log.debug("Publishing time quality config snapshot with {} configurations", message.getConfigurations().size());
@@ -47,11 +48,11 @@ public class TimeQualityConfigurationProducer {
         msg.setName(config.getName());
         msg.setNtpServers(config.getNtpServers());
         msg.setNtpCheckInterval(config.getNtpCheckInterval());
-        msg.setNtpSamplesPerServer(Objects.requireNonNullElse(config.getNtpSamplesPerServer(), 0));
+        msg.setNtpSamplesPerServer(config.getNtpSamplesPerServer());
         msg.setNtpCheckTimeout(config.getNtpCheckTimeout());
-        msg.setNtpServersMinReachable(Objects.requireNonNullElse(config.getNtpServersMinReachable(), 0));
+        msg.setNtpServersMinReachable(config.getNtpServersMinReachable());
         msg.setMaxClockDrift(config.getMaxClockDrift());
-        msg.setLeapSecondGuard(Boolean.TRUE.equals(config.getLeapSecondGuard()));
+        msg.setLeapSecondGuard(config.isLeapSecondGuard());
         return msg;
     }
 }

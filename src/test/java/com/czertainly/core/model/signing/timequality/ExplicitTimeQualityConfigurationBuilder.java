@@ -15,14 +15,14 @@ public final class ExplicitTimeQualityConfigurationBuilder {
     private Duration ntpCheckTimeout;
     private Integer ntpServersMinReachable;
     private Duration maxClockDrift;
-    private Boolean leapSecondGuard;
+    private boolean leapSecondGuard;
 
     public static ExplicitTimeQualityConfigurationBuilder anExplicitTimeQualityConfiguration() {
         return new ExplicitTimeQualityConfigurationBuilder();
     }
 
     public static ExplicitTimeQualityConfiguration valid(String name) {
-        return anExplicitTimeQualityConfiguration().withDefaults().name(name).build();
+        return anExplicitTimeQualityConfiguration().withDefaults().uuid(UUID.randomUUID()).name(name).build();
     }
 
     public ExplicitTimeQualityConfigurationBuilder withDefaults() {
@@ -84,7 +84,7 @@ public final class ExplicitTimeQualityConfigurationBuilder {
         return this;
     }
 
-    public ExplicitTimeQualityConfigurationBuilder leapSecondGuard(Boolean leapSecondGuard) {
+    public ExplicitTimeQualityConfigurationBuilder leapSecondGuard(boolean leapSecondGuard) {
         this.leapSecondGuard = leapSecondGuard;
         return this;
     }
