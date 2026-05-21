@@ -11,7 +11,7 @@ import com.czertainly.core.service.tsa.messages.TspRequest;
 import com.czertainly.core.service.tsa.messages.TspResponse;
 import com.czertainly.core.service.tsa.certificateprovider.CertificateProviderFactory;
 import com.czertainly.core.service.tsa.certificateprovider.ValidationResult;
-import com.czertainly.core.service.tsa.timequality.TimeQualityRegister;
+import com.czertainly.core.signing.tsa.timequality.TimeQualityRegister;
 import com.czertainly.api.model.messaging.timequality.TimeQualityStatus;
 import com.czertainly.core.util.clocksource.ClockSource;
 import com.czertainly.core.util.serialnumber.ClockDriftException;
