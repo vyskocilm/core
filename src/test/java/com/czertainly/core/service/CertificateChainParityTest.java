@@ -3,6 +3,7 @@ package com.czertainly.core.service;
 import com.czertainly.api.model.core.certificate.CertificateState;
 import com.czertainly.api.model.core.certificate.CertificateType;
 import com.czertainly.api.model.core.certificate.CertificateValidationStatus;
+import com.czertainly.core.config.cache.CacheConfig;
 import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.dao.entity.CertificateContent;
 import com.czertainly.core.dao.repository.CertificateContentRepository;
@@ -10,12 +11,15 @@ import com.czertainly.core.dao.repository.CertificateRepository;
 import com.czertainly.core.helpers.CertificateGeneratorHelper;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.util.BaseSpringBootTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +62,11 @@ class CertificateChainParityTest extends BaseSpringBootTest {
     @Autowired
     private CertificateContentRepository certificateContentRepository;
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    private Cache certChainCache;
+
     private Certificate selfSignedRoot;
     private Certificate twoLevelLeaf;
     private X509Certificate twoLevelRootX509;
@@ -70,6 +79,11 @@ class CertificateChainParityTest extends BaseSpringBootTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        certChainCache = cacheManager.getCache(CacheConfig.CERTIFICATE_CHAIN_CACHE);
+        if (certChainCache != null) {
+            certChainCache.clear();
+        }
+
         // Scenario: single self-signed root certificate.
         KeyPair rootKp = rsaKeyPair();
         X509Certificate rootX509 = CertificateGeneratorHelper.generateCACertificate(rootKp, "CN=Parity-Root-1");
@@ -98,6 +112,13 @@ class CertificateChainParityTest extends BaseSpringBootTest {
 
         // Scenario: certificate row exists but has no stored content.
         leafWithoutContent = persistCertificateWithoutContent();
+    }
+
+    @AfterEach
+    void evictCertChainCache() {
+        if (certChainCache != null) {
+            certChainCache.clear();
+        }
     }
 
     @FunctionalInterface

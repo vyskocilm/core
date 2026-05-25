@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 @EnableConfigurationProperties({
         AuthCacheProperties.class,
         ConnectorApiClientCacheProperties.class,
+        CertificateChainCacheProperties.class,
         CryptographicKeyItemCacheProperties.class,
 })
 public class CacheConfig {
@@ -33,14 +34,16 @@ public class CacheConfig {
     public static final String CERTIFICATE_CHAIN_CACHE = "certificateChain";
 
     @Bean
-    public CacheManager cacheManager(AuthCacheProperties authCacheProperties,
-                                     ConnectorApiClientCacheProperties connectorCacheProperties,
-                                     CryptographicKeyItemCacheProperties cryptographicKeyItemCacheProperties,
-                                     TokenJtiIndex tokenJtiIndex,
-                                     UserCertificateIndex userCertificateIndex) {
+    public CacheManager cacheManager(
+            AuthCacheProperties authCacheProperties,
+            CertificateChainCacheProperties certChainProperties,
+            ConnectorApiClientCacheProperties connectorCacheProperties,
+            CryptographicKeyItemCacheProperties cryptographicKeyItemCacheProperties,
+            TokenJtiIndex tokenJtiIndex,
+            UserCertificateIndex userCertificateIndex) {
         CaffeineCacheManager mgr = new CaffeineCacheManager(
                 SYSTEM_USER_AUTH_CACHE, USER_UUID_AUTH_CACHE,
-                SIGNING_PROFILES_CACHE, TSP_PROFILES_CACHE, CERTIFICATE_CHAIN_CACHE);
+                SIGNING_PROFILES_CACHE, TSP_PROFILES_CACHE);
         mgr.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(authCacheProperties.ttlMinutes(), TimeUnit.MINUTES)
                 .maximumSize(authCacheProperties.maxSize())
@@ -56,6 +59,12 @@ public class CacheConfig {
                 .maximumSize(authCacheProperties.maxSize())
                 .recordStats()
                 .removalListener(tokenJtiIndex)
+                .build());
+
+        mgr.registerCustomCache(CERTIFICATE_CHAIN_CACHE, Caffeine.newBuilder()
+                .expireAfterWrite(certChainProperties.ttlMinutes(), TimeUnit.MINUTES)
+                .maximumSize(certChainProperties.maxSize())
+                .recordStats()
                 .build());
 
         mgr.registerCustomCache(CONNECTOR_API_CLIENT_CACHE, Caffeine.newBuilder()
