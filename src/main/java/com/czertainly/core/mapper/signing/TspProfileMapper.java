@@ -11,7 +11,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 
-
 public class TspProfileMapper {
 
     private TspProfileMapper() {
