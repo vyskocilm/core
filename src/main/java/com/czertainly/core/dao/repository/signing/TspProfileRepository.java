@@ -27,3 +27,4 @@ public interface TspProfileRepository extends SecurityFilterRepository<TspProfil
     @Query("SELECT t.name FROM TspProfile t ORDER BY t.name")
     List<String> findAllNames();
 }
+
