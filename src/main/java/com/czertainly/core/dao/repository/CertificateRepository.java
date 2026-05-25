@@ -23,6 +23,8 @@ import java.util.UUID;
 @Repository
 public interface CertificateRepository extends SecurityFilterRepository<Certificate, UUID>, CustomCertificateRepository {
 
+    List<String> FETCH_GROUPS_AND_OWNER = List.of("groups", "owner");
+
     @EntityGraph(attributePaths = {"certificateContent"})
     Optional<Certificate> findByUuid(UUID uuid);
 
@@ -283,9 +285,9 @@ public interface CertificateRepository extends SecurityFilterRepository<Certific
                 SELECT uuid, issuer_certificate_uuid, certificate_content_id, 0 AS depth, ARRAY[uuid] AS path
                 FROM {h-schema}certificate
                 WHERE uuid = :startUuid
-
+            
                 UNION ALL
-
+            
                 SELECT c.uuid, c.issuer_certificate_uuid, c.certificate_content_id, chain.depth + 1, chain.path || c.uuid
                 FROM {h-schema}certificate c
                 INNER JOIN chain ON chain.issuer_certificate_uuid = c.uuid

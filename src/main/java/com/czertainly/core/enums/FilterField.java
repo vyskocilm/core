@@ -5,6 +5,8 @@ import com.czertainly.api.model.client.connector.v2.ConnectorInterface;
 import com.czertainly.api.model.client.connector.v2.FeatureFlag;
 import com.czertainly.api.model.client.connector.v2.ConnectorVersion;
 import com.czertainly.api.model.client.connector.v2.FeatureFlag;
+import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
+import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
 import com.czertainly.api.model.common.enums.IPlatformEnum;
 import com.czertainly.api.model.common.enums.cryptography.KeyAlgorithm;
 import com.czertainly.api.model.common.enums.cryptography.KeyFormat;
@@ -35,8 +37,6 @@ import com.czertainly.core.dao.entity.scep.ScepProfile_;
 import com.czertainly.core.dao.entity.signing.SigningProfile_;
 import com.czertainly.core.dao.entity.signing.TimeQualityConfiguration_;
 import com.czertainly.core.dao.entity.signing.TspProfile_;
-import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
-import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
 import com.czertainly.core.model.auth.ResourceAction;
 import jakarta.persistence.metamodel.Attribute;
 import lombok.Getter;
@@ -218,7 +218,7 @@ public enum FilterField {
 
     // Signing Profile
     SIGNING_PROFILE_NAME(Resource.SIGNING_PROFILE, null, null, SigningProfile_.name, "Name", SearchFieldTypeEnum.STRING),
-    SIGNING_PROFILE_ENABLED(Resource.SIGNING_PROFILE, null, null, SigningProfile_.enabled, "Enabled", SearchFieldTypeEnum.BOOLEAN),
+    SIGNING_PROFILE_ENABLED(Resource.SIGNING_PROFILE, null, null, SigningProfile_.enabled, Constants.ENABLED, SearchFieldTypeEnum.BOOLEAN),
     SIGNING_PROFILE_SIGNING_SCHEME(Resource.SIGNING_PROFILE, null, null, SigningProfile_.signingScheme, "Signing Scheme", SearchFieldTypeEnum.LIST, SigningScheme.class),
     SIGNING_PROFILE_WORKFLOW_TYPE(Resource.SIGNING_PROFILE, null, null, SigningProfile_.workflowType, "Workflow Type", SearchFieldTypeEnum.LIST, SigningWorkflowType.class),
     SIGNING_PROFILE_TSP_PROFILE(Resource.SIGNING_PROFILE, Resource.TSP_PROFILE, List.of(SigningProfile_.tspProfile), TspProfile_.name, "TSP Profile", SearchFieldTypeEnum.LIST),

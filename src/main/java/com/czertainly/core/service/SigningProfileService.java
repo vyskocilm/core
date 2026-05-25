@@ -48,6 +48,10 @@ public interface SigningProfileService extends ResourceExtensionService {
 
     SigningProfileDto getSigningProfile(SecuredUUID uuid, Integer version) throws NotFoundException;
 
+    SigningProfile getSigningProfileEntity(SecuredUUID uuid) throws NotFoundException;
+
+    List<String> findAllNames();
+
     /**
      * Resolves a Signing Profile by name, verifying it uses a timestamping workflow.
      *

@@ -5,11 +5,7 @@ import com.czertainly.api.model.client.attribute.ResponseAttribute;
 import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
 import com.czertainly.api.model.client.signing.profile.SigningProfileListDto;
 import com.czertainly.api.model.client.signing.profile.SimplifiedSigningProfileDto;
-import com.czertainly.api.model.client.signing.profile.scheme.DelegatedSigningDto;
-import com.czertainly.api.model.client.signing.profile.scheme.ManagedSigningType;
-import com.czertainly.api.model.client.signing.profile.scheme.OneTimeKeyManagedSigningDto;
-import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
-import com.czertainly.api.model.client.signing.profile.scheme.StaticKeyManagedSigningDto;
+import com.czertainly.api.model.client.signing.profile.scheme.*;
 import com.czertainly.api.model.client.signing.profile.workflow.ContentSigningWorkflowDto;
 import com.czertainly.api.model.client.signing.profile.workflow.RawSigningWorkflowDto;
 import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
@@ -31,7 +27,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 public class SigningProfileMapper {
@@ -56,7 +51,7 @@ public class SigningProfileMapper {
         dto.setName(header.getName());
         dto.setDescription(header.getDescription());
         dto.setVersion(version.getVersion() != null ? version.getVersion() : 1);
-        dto.setEnabled(header.getEnabled() != null ? header.getEnabled() : false);
+        dto.setEnabled(header.isEnabled());
         dto.setCustomAttributes(safeList(customAttributes));
 
         // Build signing scheme DTO from version
@@ -143,11 +138,10 @@ public class SigningProfileMapper {
 
         List<SigningProtocol> protocols = header.getTspProfileUuid() != null ? List.of(SigningProtocol.TSP) : List.of();
         int ver = version.getVersion() != null ? version.getVersion() : 1;
-        boolean enabled = header.getEnabled() != null ? header.getEnabled() : false;
 
         return new SigningProfileModel<>(
                 header.getUuid(), header.getName(), header.getDescription(),
-                ver, enabled, protocols,
+                ver, header.isEnabled(), protocols,
                 buildManagedTimestampingWorkflowModel(header, version, signatureFormatterConnectorAttributes),
                 buildSchemeModel(version, signingOperationAttributes));
     }
@@ -163,7 +157,7 @@ public class SigningProfileMapper {
         dto.setDescription(profile.getDescription());
         dto.setVersion(profile.getLatestVersion() != null ? profile.getLatestVersion() : 1);
         dto.setSigningWorkflowType(profile.getWorkflowType());
-        dto.setEnabled(profile.getEnabled() != null ? profile.getEnabled() : false);
+        dto.setEnabled(profile.isEnabled());
         return dto;
     }
 
@@ -185,7 +179,7 @@ public class SigningProfileMapper {
         SimplifiedSigningProfileDto signingProfileDto = new SimplifiedSigningProfileDto();
         signingProfileDto.setUuid(signingProfile.getUuid().toString());
         signingProfileDto.setName(signingProfile.getName());
-        signingProfileDto.setEnabled(Boolean.TRUE.equals(signingProfile.getEnabled()));
+        signingProfileDto.setEnabled(signingProfile.isEnabled());
         return signingProfileDto;
     }
 
@@ -279,10 +273,15 @@ public class SigningProfileMapper {
     // ──────────────────────────────────────────────────────────────────────────
 
     private static void setFormatterRef(SigningProfileVersion profileVersion, Consumer<NameAndUuidDto> setter) {
-            NameAndUuidDto ref = new NameAndUuidDto();
-            ref.setName(profileVersion.getSignatureFormatterConnector().getName());
-            ref.setUuid(profileVersion.getSignatureFormatterConnectorUuid().toString());
-            setter.accept(ref);
+        if (profileVersion.getSignatureFormatterConnector() == null
+                || profileVersion.getSignatureFormatterConnectorUuid() == null) {
+            setter.accept(null);
+            return;
+        }
+        NameAndUuidDto ref = new NameAndUuidDto();
+        ref.setName(profileVersion.getSignatureFormatterConnector().getName());
+        ref.setUuid(profileVersion.getSignatureFormatterConnectorUuid().toString());
+        setter.accept(ref);
     }
 
     private static <T> List<T> safeList(List<T> list) {
