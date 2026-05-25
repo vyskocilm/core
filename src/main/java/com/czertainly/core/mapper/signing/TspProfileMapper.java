@@ -11,6 +11,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 
+
 public class TspProfileMapper {
 
     private TspProfileMapper() {
@@ -32,7 +33,7 @@ public class TspProfileMapper {
         return dto;
     }
 
-    public static TspProfileModel toModel(TspProfile profile, List<ResponseAttribute> customAttributes) {
+    public static TspProfileModel toModel(TspProfile profile) {
         SigningProfile defaultSigningProfile = profile.getDefaultSigningProfile();
         String signingUrl = null;
         if (defaultSigningProfile != null) {
@@ -46,8 +47,7 @@ public class TspProfileMapper {
                 profile.isEnabled(),
                 defaultSigningProfile != null ? defaultSigningProfile.getUuid() : null,
                 defaultSigningProfile != null ? defaultSigningProfile.getName() : null,
-                signingUrl,
-                customAttributes
+                signingUrl
         );
     }
 

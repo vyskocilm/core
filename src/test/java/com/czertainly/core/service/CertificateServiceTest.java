@@ -147,9 +147,9 @@ class CertificateServiceTest extends BaseSpringBootTest {
     @MockitoBean
     private NotificationProducer notificationProducer;
     @Autowired
-    private RuleService ruleService;
+    private RuleExternalService ruleService;
     @Autowired
-    private TriggerService triggerService;
+    private TriggerExternalService triggerService;
 
     @Autowired
     private CacheManager cacheManager;
