@@ -67,6 +67,7 @@ import java.util.stream.Collectors;
 public class TspProfileServiceImpl implements TspProfileService {
     private AttributeEngine attributeEngine;
     private CacheManager cacheManager;
+    private AttributeEngine attributeEngine;
     private TspProfileServiceImpl self;
     private SigningProfileService signingProfileService;
     private TspProfileRepository tspProfileRepository;

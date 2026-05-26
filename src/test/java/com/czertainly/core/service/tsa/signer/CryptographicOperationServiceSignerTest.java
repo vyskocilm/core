@@ -42,7 +42,7 @@ class CryptographicOperationServiceSignerTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 List.of(),
-                SignatureAlgorithm.SHA256withRSA);
+                SignatureAlgorithm.SHA256_WITH_RSA);
     }
 
     // ── Input validation ──────────────────────────────────────────────────────
@@ -125,6 +125,6 @@ class CryptographicOperationServiceSignerTest {
 
     @Test
     void getSignatureAlgorithm_returnsAlgorithmPassedAtConstruction() {
-        assertThat(signer.getSignatureAlgorithm()).isEqualTo(SignatureAlgorithm.SHA256withRSA);
+        assertThat(signer.getSignatureAlgorithm()).isEqualTo(SignatureAlgorithm.SHA256_WITH_RSA);
     }
 }

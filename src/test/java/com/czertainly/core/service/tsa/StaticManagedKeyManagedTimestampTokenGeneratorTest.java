@@ -60,7 +60,7 @@ class StaticManagedKeyManagedTimestampTokenGeneratorTest {
     @BeforeEach
     void wireSigner() throws TspException {
         lenient().when(signerFactory.create(any())).thenReturn(signer);
-        lenient().when(signer.getSignatureAlgorithm()).thenReturn(SignatureAlgorithm.SHA256withRSA);
+        lenient().when(signer.getSignatureAlgorithm()).thenReturn(SignatureAlgorithm.SHA256_WITH_RSA);
     }
 
     @Test
@@ -74,10 +74,10 @@ class StaticManagedKeyManagedTimestampTokenGeneratorTest {
         byte[] dtbs = {1, 2, 3};
         byte[] signature = {4, 5, 6};
 
-        when(formatter.formatDtbs(eq(request), eq(profile), eq(serialNumber), eq(genTime), eq(chain), eq(SignatureAlgorithm.SHA256withRSA)))
+        when(formatter.formatDtbs(eq(request), eq(profile), eq(serialNumber), eq(genTime), eq(chain), eq(SignatureAlgorithm.SHA256_WITH_RSA)))
                 .thenReturn(dtbs);
         when(signer.sign(eq(dtbs))).thenReturn(signature);
-        when(formatter.formatSigningResponse(eq(request), eq(profile), eq(serialNumber), eq(genTime), eq(chain), eq(dtbs), eq(signature), eq(SignatureAlgorithm.SHA256withRSA)))
+        when(formatter.formatSigningResponse(eq(request), eq(profile), eq(serialNumber), eq(genTime), eq(chain), eq(dtbs), eq(signature), eq(SignatureAlgorithm.SHA256_WITH_RSA)))
                 .thenReturn(validTokenBytes);
 
         // when
@@ -106,7 +106,7 @@ class StaticManagedKeyManagedTimestampTokenGeneratorTest {
     @Test
     void generate_passesAlgorithmFromSigner_toBothFormatterPhases() throws Exception {
         // given — the formatter must receive the signer's reported algorithm in both the DTBS and signing-response phases
-        when(signer.getSignatureAlgorithm()).thenReturn(SignatureAlgorithm.SHA384withECDSA);
+        when(signer.getSignatureAlgorithm()).thenReturn(SignatureAlgorithm.SHA384_WITH_ECDSA);
         when(formatter.formatDtbs(any(), any(), any(), any(), any(), any())).thenReturn(new byte[1]);
         when(signer.sign(any())).thenReturn(new byte[1]);
         when(formatter.formatSigningResponse(any(), any(), any(), any(), any(), any(), any(), any()))
@@ -117,9 +117,9 @@ class StaticManagedKeyManagedTimestampTokenGeneratorTest {
                 mock(CertificateChain.class), BigInteger.ONE, Instant.now());
 
         // then
-        verify(formatter).formatDtbs(any(), any(), any(), any(), any(), eq(SignatureAlgorithm.SHA384withECDSA));
+        verify(formatter).formatDtbs(any(), any(), any(), any(), any(), eq(SignatureAlgorithm.SHA384_WITH_ECDSA));
         verify(formatter).formatSigningResponse(any(), any(), any(), any(), any(), any(), any(),
-                eq(SignatureAlgorithm.SHA384withECDSA));
+                eq(SignatureAlgorithm.SHA384_WITH_ECDSA));
     }
 
     @Test

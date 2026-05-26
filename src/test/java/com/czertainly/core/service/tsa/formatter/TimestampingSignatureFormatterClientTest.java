@@ -50,7 +50,7 @@ class TimestampingSignatureFormatterClientTest {
     private TspRequest request;
     private BigInteger serialNumber;
     private Instant genTime;
-    private static final SignatureAlgorithm SIGNATURE_ALGORITHM = SignatureAlgorithm.SHA256withRSA;
+    private static final SignatureAlgorithm SIGNATURE_ALGORITHM = SignatureAlgorithm.SHA256_WITH_RSA;
 
     @BeforeEach
     void setUp() {
