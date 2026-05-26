@@ -25,4 +25,6 @@ public interface SigningRecordService {
     SigningRecordDto getSigningRecord(SecuredUUID uuid) throws NotFoundException;
 
     SigningRecordValidationResultDto validateSigningRecord(SecuredUUID uuid) throws NotFoundException;
+
+    boolean doesSigningRecordExistForVersion(SecuredUUID signingProfileUuid, Integer version);
 }

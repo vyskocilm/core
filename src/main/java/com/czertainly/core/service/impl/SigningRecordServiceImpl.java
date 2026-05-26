@@ -84,4 +84,11 @@ public class SigningRecordServiceImpl implements SigningRecordService {
                 .orElseThrow(() -> new NotFoundException("Signing Record not found"));
         throw new UnsupportedOperationException("Signing record validation not yet implemented");
     }
+
+    @Override
+    @ExternalAuthorization(resource = Resource.SIGNING_RECORD, action = ResourceAction.LIST)
+    @Transactional(readOnly = true)
+    public boolean doesSigningRecordExistForVersion(SecuredUUID signingProfileUuid, Integer version) {
+        return signingRecordRepository.existsBySigningProfileUuidAndSigningProfileVersion(signingProfileUuid.getValue(), version);
+    }
 }

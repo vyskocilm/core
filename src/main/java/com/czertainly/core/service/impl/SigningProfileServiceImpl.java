@@ -56,7 +56,6 @@ import com.czertainly.core.dao.entity.signing.SigningProfile_;
 import com.czertainly.core.dao.entity.signing.SigningProfileVersion;
 import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.entity.signing.SigningRecord;
-import com.czertainly.core.dao.repository.CertificateRepository;
 import com.czertainly.core.dao.repository.CryptographicKeyItemRepository;
 import com.czertainly.core.dao.entity.signing.TimeQualityConfiguration;
 import com.czertainly.core.dao.repository.signing.SigningProfileRepository;
@@ -369,7 +368,8 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         profile.setDescription(request.getDescription());
 
         // Lenient version bump: only bump if signing records exist for the current latest version
-        boolean bump = signingRecordRepository.existsBySigningProfileUuidAndSigningProfileVersion(profile.getUuid(), profile.getLatestVersion());
+        boolean bump = signingRecordService.doesSigningRecordExistForVersion(SecuredUUID.fromUUID(profile.getUuid()),
+                profile.getLatestVersion());
         if (bump) {
             profile.setLatestVersion(profile.getLatestVersion() + 1);
         }
