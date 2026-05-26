@@ -129,24 +129,6 @@ public class SigningProfileControllerImpl implements SigningProfileController {
     }
 
     @Override
-    @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_PROFILE, operation = Operation.DETAIL)
-    public List<ApprovalProfileDto> getAssociatedApprovalProfiles(@LogResource(uuid = true) UUID uuid) throws NotFoundException {
-        return signingProfileService.getAssociatedApprovalProfiles(SecuredUUID.fromUUID(uuid));
-    }
-
-    @Override
-    @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_PROFILE, operation = Operation.UPDATE)
-    public void associateWithApprovalProfile(@LogResource(uuid = true) UUID signingProfileUuid, @LogResource(uuid = true, affiliated = true) UUID approvalProfileUuid) throws NotFoundException {
-        signingProfileService.associateWithApprovalProfile(SecuredUUID.fromUUID(signingProfileUuid), SecuredUUID.fromUUID(approvalProfileUuid));
-    }
-
-    @Override
-    @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_PROFILE, operation = Operation.UPDATE)
-    public void disassociateFromApprovalProfile(@LogResource(uuid = true) UUID signingProfileUuid, @LogResource(uuid = true, affiliated = true) UUID approvalProfileUuid) throws NotFoundException {
-        signingProfileService.disassociateFromApprovalProfile(SecuredUUID.fromUUID(signingProfileUuid), SecuredUUID.fromUUID(approvalProfileUuid));
-    }
-
-    @Override
     @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_PROFILE, operation = Operation.LIST)
     public List<CertificateDto> listSigningCertificates(SigningWorkflowType signingWorkflowType, boolean qualifiedTimestamp) {
         return signingProfileService.listSigningCertificates(signingWorkflowType, qualifiedTimestamp);
