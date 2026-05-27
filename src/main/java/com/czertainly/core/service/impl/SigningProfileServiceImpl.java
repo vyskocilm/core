@@ -54,6 +54,7 @@ import com.czertainly.core.dao.repository.CryptographicKeyItemRepository;
 import com.czertainly.core.dao.entity.signing.TimeQualityConfiguration;
 import com.czertainly.core.dao.repository.signing.SigningProfileRepository;
 import com.czertainly.core.dao.repository.signing.SigningProfileVersionRepository;
+import com.czertainly.core.service.writer.SigningProfileWriter;
 import com.czertainly.core.dao.repository.signing.TimeQualityConfigurationRepository;
 import com.czertainly.api.model.client.connector.v2.ConnectorInterface;
 import com.czertainly.api.model.client.connector.v2.FeatureFlag;
@@ -112,6 +113,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     private CryptographicKeyItemRepository cryptographicKeyItemRepository;
     private SigningProfileRepository signingProfileRepository;
     private SigningProfileVersionRepository signingProfileVersionRepository;
+    private SigningProfileWriter signingProfileWriter;
     private TimeQualityConfigurationRepository timeQualityConfigurationRepository;
     private TspProfileService tspProfileService;
     private AttributeEngine attributeEngine;
@@ -273,16 +275,13 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         profile.setName(request.getName());
         profile.setDescription(request.getDescription());
         profile.setLatestVersion(1);
-        profile.setSigningScheme(request.getSigningScheme().getSigningScheme());
-        profile.setWorkflowType(request.getWorkflow().getType());
-        profile = signingProfileRepository.save(profile);
 
         SigningProfileVersion v1 = new SigningProfileVersion();
-        v1.setSigningProfile(profile);
         v1.setVersion(1);
         applyWorkflow(profile, v1, request.getWorkflow());
         applyScheme(profile, v1, request.getSigningScheme());
         profile = signingProfileRepository.save(profile);
+        v1.setSigningProfile(profile);
         signingProfileVersionRepository.save(v1);
 
         List<ResponseAttribute> customAttributes = attributeEngine.updateObjectCustomAttributesContent(Resource.SIGNING_PROFILE, profile.getUuid(), request.getCustomAttributes());
@@ -387,7 +386,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
             );
         }
 
-        signingProfileVersionRepository.deleteAllBySigningProfileUuid(signingProfile.getUuid());
+        signingProfileWriter.deleteAllVersionsBySigningProfileUuid(signingProfile.getUuid());
         signingProfileRepository.delete(signingProfile);
         attributeEngine.deleteObjectAttributeContent(Resource.SIGNING_PROFILE, signingProfile.getUuid());
         tspProfileService.evictAllCachedModels();
@@ -833,6 +832,11 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     @Autowired
     public void setSigningProfileVersionRepository(SigningProfileVersionRepository signingProfileVersionRepository) {
         this.signingProfileVersionRepository = signingProfileVersionRepository;
+    }
+
+    @Autowired
+    public void setSigningProfileWriter(SigningProfileWriter signingProfileWriter) {
+        this.signingProfileWriter = signingProfileWriter;
     }
 
     @Autowired
