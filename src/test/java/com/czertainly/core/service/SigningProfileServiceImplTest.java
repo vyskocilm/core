@@ -60,7 +60,6 @@ import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.dao.repository.AttributeDefinitionRepository;
 import com.czertainly.core.dao.repository.AttributeRelationRepository;
-import com.czertainly.core.dao.repository.signing.SigningRecordRepository;
 import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.helpers.CertificateGeneratorHelper;
 import com.czertainly.core.helpers.TestCertificateAuthority;
@@ -161,7 +160,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
 
     private TspProfileDto defaultTspProtocol;
     @Autowired
-    private SigningRecordRepository signingRecordRepository;
+    private SigningRecordService signingRecordService;
 
     @Autowired
     private AttributeEngine attributeEngine;
@@ -310,9 +309,9 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         signerConnectorServerMock.stop();
     }
 
-    private void createSigningRecordFor(SigningProfileDto profile, int version) throws NotFoundException {
-        SigningProfile entity = signingProfileService.getSigningProfileEntity(SecuredUUID.fromString(profile.getUuid()));
-        signingRecordRepository.save(aSigningRecord().withSigningProfile(entity).withVersion(version).build());
+    private void createSigningRecordFor(SigningProfileDto profile) {
+        signingRecordService.saveSigningRecord(aSigningRecord()
+                .withSigningProfile(profile).build());
     }
 
     @Test
@@ -463,7 +462,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         void returnsLatestVersionByDefault() throws NotFoundException, ConnectorException, AlreadyExistException, AttributeException {
             // given: profile with multiple versions
             SecuredUUID profileUuid = SecuredUUID.fromString(defaultDelegatedSigningProfile.getUuid());
-            createSigningRecordFor(defaultDelegatedSigningProfile, 1);
+            createSigningRecordFor(defaultDelegatedSigningProfile);
             signingProfileService.updateSigningProfile(
                     profileUuid,
                     aSigningProfileRequestFromExistingProfile(defaultDelegatedSigningProfile)
@@ -485,7 +484,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         void specificVersion_returnsSnapshotData() throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
             // given: profile with multiple versions
             SecuredUUID profileUuid = SecuredUUID.fromString(defaultDelegatedSigningProfile.getUuid());
-            createSigningRecordFor(defaultDelegatedSigningProfile, 1);
+            createSigningRecordFor(defaultDelegatedSigningProfile);
             signingProfileService.updateSigningProfile(
                     profileUuid,
                     aSigningProfileRequestFromExistingProfile(defaultDelegatedSigningProfile)
@@ -529,7 +528,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                             .build()
             );
             SecuredUUID profileUuid = SecuredUUID.fromString(existingProfile.getUuid());
-            createSigningRecordFor(existingProfile, 1);
+            createSigningRecordFor(existingProfile);
 
             // when: the profile is updated to use a different workflow type (timestamping)
             signingProfileService.updateSigningProfile(
@@ -947,7 +946,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         void withSigningRecordsOnCurrentVersion_bumpsVersion()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
             // given: a signing record linked to version 1
-            createSigningRecordFor(defaultDelegatedSigningProfile, 1);
+            createSigningRecordFor(defaultDelegatedSigningProfile);
             SecuredUUID profileUuid = SecuredUUID.fromString(defaultDelegatedSigningProfile.getUuid());
 
             // when
@@ -992,7 +991,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         void withSigningRecordsOnFirstVersion_firstUpdateBumps_secondUpdateOverwritesLatest()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
             // given: a signing record linked to version 1
-            createSigningRecordFor(defaultDelegatedSigningProfile, 1);
+            createSigningRecordFor(defaultDelegatedSigningProfile);
             SecuredUUID profileUuid = SecuredUUID.fromString(defaultDelegatedSigningProfile.getUuid());
 
             // when: first update — signing record on v1 forces a version bump
@@ -1040,7 +1039,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                             .build()
             );
             SecuredUUID profileUuid = SecuredUUID.fromString(v1Profile.getUuid());
-            createSigningRecordFor(v1Profile, 1);
+            createSigningRecordFor(v1Profile);
 
             // when: bump to v2 with a different attribute value
             signingProfileService.updateSigningProfile(
@@ -1135,7 +1134,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             @Test
             void withSigningRecords_returnsErrorAndLeavesBlockedProfileIntact() throws NotFoundException {
                 // given: the blocked signing profile has a signing record; the second has none
-                createSigningRecordFor(defaultDelegatedSigningProfile, 1);
+                createSigningRecordFor(defaultDelegatedSigningProfile);
                 SecuredUUID blockedProfileUuid = SecuredUUID.fromString(defaultDelegatedSigningProfile.getUuid());
                 SecuredUUID notBlockedProfileUuid = SecuredUUID.fromString(defaultTimestampingProfile.getUuid());
 
@@ -1622,7 +1621,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                                     rsaSignatureAttributes().withScheme(RsaSignatureScheme.PSS).withDigest(DigestAlgorithm.SHA_256).build())
                             .build());
             SecuredUUID profileUuid = SecuredUUID.fromString(created.getUuid());
-            createSigningRecordFor(created, 1);
+            createSigningRecordFor(created);
 
             // when: bump to v2 with PKCS1_v1_5/SHA_384
             signingProfileService.updateSigningProfile(profileUuid,

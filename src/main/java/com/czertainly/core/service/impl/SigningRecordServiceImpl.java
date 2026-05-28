@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class SigningRecordServiceImpl implements SigningRecordService {
@@ -90,5 +91,20 @@ public class SigningRecordServiceImpl implements SigningRecordService {
     @Transactional(readOnly = true)
     public boolean doesSigningRecordExistForVersion(SecuredUUID signingProfileUuid, Integer version) {
         return signingRecordRepository.existsBySigningProfileUuidAndSigningProfileVersion(signingProfileUuid.getValue(), version);
+    }
+
+    @Override
+    @Transactional
+    public SigningRecordDto saveSigningRecord(SigningRecordDto dto) {
+        SigningRecord record = new SigningRecord();
+        if (dto.getSigningProfile() != null) {
+            record.setSigningProfileUuid(UUID.fromString(dto.getSigningProfile().getUuid()));
+        }
+        record.setSigningProfileVersion(dto.getSigningProfile().getVersion());
+        if (dto.getSigningTime() != null) {
+            record.setSigningTime(dto.getSigningTime().toOffsetDateTime());
+        }
+        record.setSignatureValue(dto.getSignatureValue());
+        return SigningRecordMapper.toDto(signingRecordRepository.save(record));
     }
 }
