@@ -657,6 +657,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
             }
             case DelegatedSigningRequestDto s -> {
                 Connector connector = connectorService.getConnectorEntity(SecuredUUID.fromUUID(s.getConnectorUuid()));
+                validateDelegatedSignerConnectorInterface(connector);
                 version.setDelegatedSignerConnector(connector);
             }
             default ->
@@ -716,6 +717,15 @@ public class SigningProfileServiceImpl implements SigningProfileService {
                 }
             }
             default -> throw new IllegalStateException("Unexpected type for Signing Workflow: " + workflow);
+        }
+    }
+
+    private void validateDelegatedSignerConnectorInterface(Connector connector) {
+        boolean hasSigning = connector.getInterfaces().stream()
+                .anyMatch(i -> ConnectorInterface.SIGNING.equals(i.getInterfaceCode()));
+        if (!hasSigning) {
+            throw new ValidationException("Connector '%s' does not implement the '%s' interface required for delegated signing"
+                    .formatted(connector.getName(), ConnectorInterface.SIGNING.getLabel()));
         }
     }
 
@@ -963,5 +973,10 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     @Autowired
     public void setConnectorApiFactory(ConnectorApiFactory connectorApiFactory) {
         this.connectorApiFactory = connectorApiFactory;
+    }
+
+    @Autowired
+    public void setSigningRecordService(SigningRecordService signingRecordService) {
+        this.signingRecordService = signingRecordService;
     }
 }

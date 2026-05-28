@@ -248,10 +248,18 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Test
     void testCreateTspProfile_withDefaultSigningProfile_assertDtoAndDbEntity() throws AlreadyExistException, AttributeException, NotFoundException {
+        SigningProfile timestampingProfile = new SigningProfile();
+        timestampingProfile.setName("timestamping-signing-profile");
+        timestampingProfile.setEnabled(false);
+        timestampingProfile.setSigningScheme(SigningScheme.DELEGATED);
+        timestampingProfile.setWorkflowType(SigningWorkflowType.TIMESTAMPING);
+        timestampingProfile.setLatestVersion(1);
+        timestampingProfile = signingProfileRepository.save(timestampingProfile);
+
         TspProfileRequestDto request = new TspProfileRequestDto();
         request.setName("tsp-with-default-profile");
         request.setDescription("TSP with default signing profile");
-        request.setDefaultSigningProfileUuid(savedSigningProfile.getUuid());
+        request.setDefaultSigningProfileUuid(timestampingProfile.getUuid());
 
         TspProfileDto dto = tspService.createTspProfile(request);
 
@@ -265,7 +273,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         Assertions.assertTrue(fromDb.isPresent());
         TspProfile entity = fromDb.get();
         Assertions.assertEquals("tsp-with-default-profile", entity.getName());
-        Assertions.assertEquals(savedSigningProfile.getUuid(), entity.getDefaultSigningProfileUuid());
+        Assertions.assertEquals(timestampingProfile.getUuid(), entity.getDefaultSigningProfileUuid());
     }
 
     @Test
@@ -307,10 +315,18 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Test
     void testUpdateTspProfile_withDefaultSigningProfile_assertDtoAndDbEntity() throws AlreadyExistException, AttributeException, NotFoundException {
+        SigningProfile timestampingProfile = new SigningProfile();
+        timestampingProfile.setName("timestamping-signing-profile-for-update");
+        timestampingProfile.setEnabled(false);
+        timestampingProfile.setSigningScheme(SigningScheme.DELEGATED);
+        timestampingProfile.setWorkflowType(SigningWorkflowType.TIMESTAMPING);
+        timestampingProfile.setLatestVersion(1);
+        timestampingProfile = signingProfileRepository.save(timestampingProfile);
+
         TspProfileRequestDto request = new TspProfileRequestDto();
         request.setName("updated-tsp-with-profile");
         request.setDescription("Updated with default profile");
-        request.setDefaultSigningProfileUuid(savedSigningProfile.getUuid());
+        request.setDefaultSigningProfileUuid(timestampingProfile.getUuid());
 
         TspProfileDto dto = tspService.updateTspProfile(savedTspProfile.getSecuredUuid(), request);
 
@@ -321,7 +337,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         // Assert entity reloaded from the database
         Optional<TspProfile> fromDb = tspRepository.findById(savedTspProfile.getUuid());
         Assertions.assertTrue(fromDb.isPresent());
-        Assertions.assertEquals(savedSigningProfile.getUuid(), fromDb.get().getDefaultSigningProfileUuid());
+        Assertions.assertEquals(timestampingProfile.getUuid(), fromDb.get().getDefaultSigningProfileUuid());
     }
 
     @Test
