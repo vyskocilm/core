@@ -72,6 +72,7 @@ import com.czertainly.core.security.authz.SecuredParentUUID;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.*;
+import com.czertainly.core.service.writer.CertificateValidationWriter;
 import com.czertainly.core.service.v2.ConnectorService;
 import com.czertainly.core.service.v2.ExtendedAttributeService;
 import com.czertainly.core.config.cache.CacheConfig;
@@ -147,6 +148,7 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
 
     private CertificateRepository certificateRepository;
     private CertificateChainService chainService;
+    private CertificateValidationWriter validationWriter;
     private CertificateRequestRepository certificateRequestRepository;
     private RaProfileRepository raProfileRepository;
     private RaProfileService raProfileService;
@@ -155,8 +157,9 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
     private LocationRepository locationRepository;
     private CertificateContentRepository certificateContentRepository;
     private DiscoveryCertificateRepository discoveryCertificateRepository;
-    private ComplianceService complianceService;
-    private CertificateEventHistoryService certificateEventHistoryService;
+    private ComplianceInternalService complianceService;
+    private ComplianceExternalService complianceExternalService;
+    private CertificateEventHistoryInternalService certificateEventHistoryService;
     private LocationService locationService;
     private CryptographicKeyService cryptographicKeyService;
     private PermissionEvaluator permissionEvaluator;
@@ -257,6 +260,11 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
     }
 
     @Autowired
+    public void setValidationWriter(CertificateValidationWriter validationWriter) {
+        this.validationWriter = validationWriter;
+    }
+
+    @Autowired
     public void setCertificateRequestRepository(CertificateRequestRepository certificateRequestRepository) {
         this.certificateRequestRepository = certificateRequestRepository;
     }
@@ -292,12 +300,17 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
     }
 
     @Autowired
-    public void setComplianceService(ComplianceService complianceService) {
+    public void setComplianceService(ComplianceInternalService complianceService) {
         this.complianceService = complianceService;
     }
 
     @Autowired
-    public void setCertificateEventHistoryService(CertificateEventHistoryService certificateEventHistoryService) {
+    public void setComplianceExternalService(ComplianceExternalService complianceExternalService) {
+        this.complianceExternalService = complianceExternalService;
+    }
+
+    @Autowired
+    public void setCertificateEventHistoryService(CertificateEventHistoryInternalService certificateEventHistoryService) {
         this.certificateEventHistoryService = certificateEventHistoryService;
     }
 
@@ -905,9 +918,11 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
         } catch (Exception e) {
             logger.warn("Unable to validate the certificate {}: {}", certificate, e.getMessage());
             newStatus = CertificateValidationStatus.FAILED;
+            OffsetDateTime now = OffsetDateTime.now();
+            validationWriter.applyValidationResult(certificate.getUuid(), newStatus, now, null);
             certificate.setValidationStatus(newStatus);
-            certificate.setStatusValidationTimestamp(OffsetDateTime.now());
-            certificateRepository.save(certificate);
+            certificate.setStatusValidationTimestamp(now);
+            certificate.setCertificateValidationResult(null);
         }
 
         if (!oldStatus.equals(newStatus)) {
@@ -1928,7 +1943,7 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
     private void certificateComplianceCheck(Certificate certificate) {
         if (certificate.getRaProfile() != null) {
             try {
-                complianceService.checkResourceObjectComplianceAsync(Resource.CERTIFICATE, certificate.getUuid());
+                complianceExternalService.checkResourceObjectComplianceAsync(Resource.CERTIFICATE, certificate.getUuid());
             } catch (Exception e) {
                 logger.debug("Error when checking compliance: {}", e.getMessage());
             }
@@ -1993,7 +2008,7 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
             attributeEngine.updateMetadataAttributes(response.getMeta(), ObjectAttributeContentInfo.builder(Resource.CERTIFICATE, certificate.getUuid()).connector(connectorUuid).build());
 
             try {
-                complianceService.checkResourceObjectComplianceAsync(Resource.CERTIFICATE, certificate.getUuid());
+                complianceExternalService.checkResourceObjectComplianceAsync(Resource.CERTIFICATE, certificate.getUuid());
             } catch (Exception e) {
                 logger.error("Error when checking compliance:", e);
             }

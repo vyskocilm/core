@@ -15,6 +15,10 @@ import java.util.UUID;
  * managed and delegated record variants, so all scheme-scoped fields are only accessible on the
  * correct variant via pattern matching — enforced at compile time.</p>
  *
+ * <p>This model is shaped to be safely cached: it holds <strong>only UUIDs</strong> for objects
+ * owned by other caches (Time Quality Configuration, certificate-chain) or other repositories
+ * (RA profile, token profile, connectors). It never embeds entities or peer-cache model objects.</p>
+ *
  * @param uuid              UUID of the Signing Profile.
  * @param name              Name of the Signing Profile.
  * @param description       Optional description.
@@ -26,6 +30,7 @@ import java.util.UUID;
  * @param <W>               Concrete {@link SigningWorkflow} subtype.
  * @param <SM>              Concrete {@link SigningSchemeModel} subtype.
  */
+@SuppressWarnings("java:S119")
 public record SigningProfileModel<W extends SigningWorkflow, SM extends SigningSchemeModel>(
         UUID uuid,
         String name,

@@ -12,15 +12,7 @@ import java.util.List;
  * {@code allowedDigestAlgorithms}, {@code validateTokenSignature}) are accessible on this
  * interface for both managed and delegated signing. Fields that are only relevant for
  * ILM-managed signing (Signature Formatter Connector reference, {@code isQualifiedTimestamp},
- * {@code timeQualityConfiguration}) are scoped to {@link ManagedTimestampingWorkflow} only.</p>
- *
- * <p>Use pattern matching to access managed-only fields:</p>
- * <pre>{@code
- * switch (profile.getWorkflow()) {
- *     case ManagedTimestampingWorkflow m -> m.signatureFormatterConnectorUuid();
- *     case DelegatedTimestampingWorkflow d -> { /* formatter not available *\/ }
- * }
- * }</pre>
+ * {@code timeQualityConfigurationUuid}) are scoped to {@link ManagedTimestampingWorkflow} only.</p>
  */
 public sealed interface TimestampingWorkflow extends SigningWorkflow
         permits ManagedTimestampingWorkflow, DelegatedTimestampingWorkflow {
@@ -29,10 +21,6 @@ public sealed interface TimestampingWorkflow extends SigningWorkflow
     default SigningWorkflowType getWorkflowType() {
         return SigningWorkflowType.TIMESTAMPING;
     }
-
-    // -------------------------------------------------------------------------
-    // Common fields — available for both managed and delegated signing
-    // -------------------------------------------------------------------------
 
     String defaultPolicyId();
     List<String> allowedPolicyIds();

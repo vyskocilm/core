@@ -25,9 +25,6 @@ import com.czertainly.api.model.client.signing.profile.scheme.OneTimeKeyManagedS
 import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
 import com.czertainly.api.model.client.signing.profile.scheme.SigningSchemeRequestDto;
 import com.czertainly.api.model.client.signing.profile.scheme.StaticKeyManagedSigningRequestDto;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.api.model.client.signing.protocols.tsp.TspActivationDetailDto;
 import com.czertainly.api.model.common.BulkActionMessageDto;
 import com.czertainly.api.model.common.PaginationResponseDto;
@@ -41,11 +38,13 @@ import com.czertainly.api.model.core.search.FilterFieldSource;
 import com.czertainly.api.model.core.search.SearchFieldDataByGroupDto;
 import com.czertainly.api.model.core.search.SearchFieldDataDto;
 import com.czertainly.core.comparator.SearchFieldDataComparator;
+import com.czertainly.core.config.cache.CacheConfig;
+import com.czertainly.core.config.cache.CacheEvictions;
 import com.czertainly.core.enums.FilterField;
+import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.util.SearchHelper;
 import com.czertainly.api.model.core.signing.SigningProtocol;
 import com.czertainly.api.model.core.signing.signingrecord.SigningRecordListDto;
-import com.czertainly.core.config.cache.CacheConfig;
 import com.czertainly.core.attribute.engine.AttributeEngine;
 import com.czertainly.core.attribute.engine.AttributeOperation;
 import com.czertainly.core.attribute.engine.records.ObjectAttributeContentInfo;
@@ -54,8 +53,8 @@ import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.dao.entity.signing.SigningProfile_;
 import com.czertainly.core.dao.entity.signing.SigningProfileVersion;
-import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.entity.signing.SigningRecord;
+import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.repository.CryptographicKeyItemRepository;
 import com.czertainly.core.dao.entity.signing.TimeQualityConfiguration;
 import com.czertainly.core.dao.repository.signing.SigningProfileRepository;
@@ -69,7 +68,6 @@ import com.czertainly.core.dao.entity.RaProfile;
 import com.czertainly.core.dao.entity.TokenProfile;
 import com.czertainly.core.mapper.signing.SigningProfileMapper;
 import com.czertainly.core.model.auth.ResourceAction;
-import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.security.authz.ExternalAuthorization;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
@@ -78,8 +76,8 @@ import com.czertainly.core.service.ConnectorService;
 import com.czertainly.core.service.CryptographicOperationService;
 import com.czertainly.core.service.RaProfileService;
 import com.czertainly.core.service.SigningProfileService;
-import com.czertainly.core.service.TokenProfileService;
 import com.czertainly.core.service.SigningRecordService;
+import com.czertainly.core.service.TokenProfileService;
 import com.czertainly.core.service.TspProfileService;
 import com.czertainly.core.service.model.SecuredList;
 import com.czertainly.core.util.CertificateUtil;
@@ -91,10 +89,9 @@ import jakarta.persistence.criteria.Root;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.function.TriFunction;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -116,7 +113,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     );
 
     private SigningProfileServiceImpl self;
-    private CacheManager cacheManager;
     private CryptographicOperationService cryptographicOperationService;
     private CertificateService certificateService;
     private ConnectorService connectorService;
@@ -131,6 +127,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     private TspProfileService tspProfileService;
     private AttributeEngine attributeEngine;
     private ConnectorApiFactory connectorApiFactory;
+    private CacheManager cacheManager;
 
     // ──────────────────────────────────────────────────────────────────────────
     // List / search
@@ -250,6 +247,49 @@ public class SigningProfileServiceImpl implements SigningProfileService {
 
     @Override
     @ExternalAuthorization(resource = Resource.SIGNING_PROFILE, action = ResourceAction.DETAIL)
+    public SigningProfileModel<?, ?> getSigningProfileModel(String name) throws NotFoundException {
+        return self.loadSigningProfileModel(name);
+    }
+
+    // Package-private internal cache loader, self-invoked.
+    @Cacheable(value = CacheConfig.SIGNING_PROFILE_CACHE, key = "#name", sync = true)
+    @Transactional(readOnly = true)
+    SigningProfileModel<?, ?> loadSigningProfileModel(String name) throws NotFoundException {
+        SigningProfile profile = signingProfileRepository.findByName(name)
+                .orElseThrow(() -> new NotFoundException(SigningProfile.class, name));
+        SigningProfileVersion currentVersion = profile.getVersions().stream()
+                .filter(v -> v.getVersion() == profile.getLatestVersion())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Signing Profile '" + name
+                        + "' has no row for latestVersion " + profile.getLatestVersion()));
+
+        List<RequestAttribute> signingOperationAttributes = attributeEngine.getRequestObjectDataAttributesContent(
+                ObjectAttributeContentInfo.builder(Resource.SIGNING_PROFILE, profile.getUuid())
+                        .operation(AttributeOperation.SIGN)
+                        .version(currentVersion.getVersion()).build());
+        List<RequestAttribute> signatureFormatterConnectorAttributes = attributeEngine.getRequestObjectDataAttributesContent(
+                ObjectAttributeContentInfo.builder(Resource.SIGNING_PROFILE, profile.getUuid())
+                        .connector(currentVersion.getSignatureFormatterConnectorUuid())
+                        .operation(AttributeOperation.WORKFLOW_FORMATTER)
+                        .version(currentVersion.getVersion()).build());
+
+        // Narrow scope: only managed-timestamping profiles are cacheable for now.
+        return SigningProfileMapper.toManagedTimestampingModel(
+                profile, currentVersion, signingOperationAttributes, signatureFormatterConnectorAttributes);
+    }
+
+    /**
+     * Evicts a signing profile by name. Callers inside a {@code @Transactional} method
+     * (persistUpdate/delete/enable/disable/activateTsp/deactivateTsp) reach the deferred branch, so the cache entry
+     * survives until the mutating transaction commits. Callers whose transaction has already committed (the
+     * {@code NOT_SUPPORTED} create path) evict immediately.
+     */
+    private void evictSigningProfileCache(String name) {
+        CacheEvictions.evictAfterCommit(cacheManager.getCache(CacheConfig.SIGNING_PROFILE_CACHE), name);
+    }
+
+    @Override
+    @ExternalAuthorization(resource = Resource.SIGNING_PROFILE, action = ResourceAction.DETAIL)
     @Transactional(readOnly = true)
     public SigningProfileDto getSigningProfile(SecuredUUID uuid, Integer version) throws NotFoundException {
         SigningProfile profile = findByUuid(uuid);
@@ -261,37 +301,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         } else {
             return buildDtoFromProfile(profile);
         }
-    }
-
-    @Override
-    @Cacheable(value = CacheConfig.SIGNING_PROFILES_CACHE, key = "#name", sync = true)
-    // No @ExternalAuthorization — TsaService authorizes the request before calling this. Do not call from elsewhere.
-    @Transactional(readOnly = true)
-    public SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> getManagedTimestampingProfileModel(String name) throws NotFoundException {
-        SigningProfile profile = signingProfileRepository.findWithTimeQualityConfigurationByName(name)
-                .orElseThrow(() -> new NotFoundException("Signing Profile not found: " + name));
-
-        if (profile.getWorkflowType() != SigningWorkflowType.TIMESTAMPING) {
-            throw new NotFoundException("Signing Profile '%s' is not configured with a timestamping workflow".formatted(name));
-        }
-        SigningProfileVersion version = signingProfileVersionRepository
-                .findWithAssociationsBySigningProfileUuidAndVersion(profile.getUuid(), profile.getLatestVersion())
-                .orElseThrow(() -> new IllegalStateException("No version row for profile " + profile.getUuid()));
-        return buildModel(profile, version, SigningProfileMapper::toManagedTimestampingModel);
-    }
-
-    private <T> T buildModel(SigningProfile profile, SigningProfileVersion version, SigningProfileMapper.SigningProfileModelFactory<T> factory) {
-        UUID profileUuid = profile.getUuid();
-        List<RequestAttribute> signingOperationAttributes = attributeEngine
-                .getRequestObjectDataAttributesContent(ObjectAttributeContentInfo.builder(Resource.SIGNING_PROFILE, profileUuid)
-                        .operation(AttributeOperation.SIGN)
-                        .version(version.getVersion()).build());
-        List<RequestAttribute> signatureFormatterConnectorAttributes = attributeEngine
-                .getRequestObjectDataAttributesContent(ObjectAttributeContentInfo.builder(Resource.SIGNING_PROFILE, profileUuid)
-                        .connector(version.getSignatureFormatterConnectorUuid())
-                        .operation(AttributeOperation.WORKFLOW_FORMATTER)
-                        .version(version.getVersion()).build());
-        return factory.create(profile, version, signingOperationAttributes, signatureFormatterConnectorAttributes);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -309,7 +318,9 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         validateSigningSchemeCoherence(request.getSigningScheme());
         attributeEngine.validateCustomAttributesContent(Resource.SIGNING_PROFILE, request.getCustomAttributes());
         List<BaseAttribute> formatterDefinitions = fetchFormatterAttributeDefinitions(request.getWorkflow());
-        return self.persistCreate(request, formatterDefinitions);
+        SigningProfileDto created = self.persistCreate(request, formatterDefinitions);
+        evictSigningProfileCache(created.getName());
+        return created;
     }
 
     @Transactional
@@ -356,31 +367,31 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         signingProfileVersionRepository.acquireAdvisoryLock("signing-profile:" + uuid.getValue());
 
         SigningProfile profile = findByUuid(uuid);
+        // Capture the previous name under the advisory lock so concurrent renames evict the committed source name.
+        String oldName = profile.getName();
 
         Optional<SigningProfile> existingWithSameName = signingProfileRepository.findByName(request.getName());
         if (existingWithSameName.isPresent() && !existingWithSameName.get().getUuid().equals(profile.getUuid())) {
             throw new AlreadyExistException("Signing Profile with name '" + request.getName() + "' already exists.");
         }
 
-        String oldName = profile.getName();
         profile.setName(request.getName());
         profile.setDescription(request.getDescription());
 
-        // Lenient version bump: only bump if signing records exist for the current latest version
-        boolean bump = signingRecordService.doesSigningRecordExistForVersion(SecuredUUID.fromUUID(profile.getUuid()),
-                profile.getLatestVersion());
-        if (bump) {
-            profile.setLatestVersion(profile.getLatestVersion() + 1);
-        }
+        // Lenient version bump: only create a new version if signing records already reference the current one.
+        boolean bump = signingRecordService.doesSigningRecordExistForVersion(
+                SecuredUUID.fromUUID(profile.getUuid()), profile.getLatestVersion());
 
         SigningProfileVersion version;
         if (bump) {
+            profile.setLatestVersion(profile.getLatestVersion() + 1);
             version = new SigningProfileVersion();
             version.setSigningProfile(profile);
             version.setVersion(profile.getLatestVersion());
         } else {
             final SigningProfile profileRef = profile;
-            version = signingProfileVersionRepository.findBySigningProfileUuidAndVersion(profile.getUuid(), profile.getLatestVersion())
+            version = signingProfileVersionRepository
+                    .findBySigningProfileUuidAndVersion(profile.getUuid(), profile.getLatestVersion())
                     .orElseGet(() -> {
                         SigningProfileVersion v = new SigningProfileVersion();
                         v.setSigningProfile(profileRef);
@@ -397,12 +408,10 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         List<ResponseAttribute> customAttributes = attributeEngine.updateObjectCustomAttributesContent(Resource.SIGNING_PROFILE, profile.getUuid(), request.getCustomAttributes());
         List<ResponseAttribute> signingOperationAttributes = persistSigningOperationAttributes(profile, version, request.getSigningScheme());
         List<ResponseAttribute> signatureFormatterConnectorAttributes = persistSignatureFormatterConnectorAttributes(profile, version, request.getWorkflow(), formatterDefinitions);
-
-        evictSigningProfileCache(oldName);
         tspProfileService.evictAllCachedModels();
-
-        return SigningProfileMapper.toDto(profile, version, customAttributes, signingOperationAttributes,
-                signatureFormatterConnectorAttributes);
+        evictSigningProfileCache(oldName);
+        evictSigningProfileCache(profile.getName());
+        return SigningProfileMapper.toDto(profile, version, customAttributes, signingOperationAttributes, signatureFormatterConnectorAttributes);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -414,7 +423,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     @Transactional
     public void deleteSigningProfile(SecuredUUID uuid) throws NotFoundException, ValidationException {
         SigningProfile profile = findByUuid(uuid);
-        evictSigningProfileCache(profile.getName());
         deleteSigningProfile(profile);
     }
 
@@ -469,6 +477,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         signingProfileRepository.delete(signingProfile);
         attributeEngine.deleteObjectAttributeContent(Resource.SIGNING_PROFILE, signingProfile.getUuid());
         tspProfileService.evictAllCachedModels();
+        evictSigningProfileCache(signingProfile.getName());
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -508,6 +517,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         p.setEnabled(true);
         signingProfileRepository.save(p);
         tspProfileService.evictAllCachedModels();
+        evictSigningProfileCache(p.getName());
     }
 
     @Override
@@ -543,6 +553,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         p.setEnabled(false);
         signingProfileRepository.save(p);
         tspProfileService.evictAllCachedModels();
+        evictSigningProfileCache(p.getName());
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -580,6 +591,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         signingProfile.setTspProfile(tspProfile);
         signingProfileRepository.save(signingProfile);
         tspProfileService.evictAllCachedModels();
+        evictSigningProfileCache(signingProfile.getName());
         return SigningProfileMapper.toTspActivationDto(signingProfile);
     }
 
@@ -591,6 +603,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         profile.setTspProfile(null);
         signingProfileRepository.save(profile);
         tspProfileService.evictAllCachedModels();
+        evictSigningProfileCache(profile.getName());
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -657,7 +670,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
             }
             case DelegatedSigningRequestDto s -> {
                 Connector connector = connectorService.getConnectorEntity(SecuredUUID.fromUUID(s.getConnectorUuid()));
-                validateDelegatedSignerConnectorInterface(connector);
                 version.setDelegatedSignerConnector(connector);
             }
             default ->
@@ -717,15 +729,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
                 }
             }
             default -> throw new IllegalStateException("Unexpected type for Signing Workflow: " + workflow);
-        }
-    }
-
-    private void validateDelegatedSignerConnectorInterface(Connector connector) {
-        boolean hasSigning = connector.getInterfaces().stream()
-                .anyMatch(i -> ConnectorInterface.SIGNING.equals(i.getInterfaceCode()));
-        if (!hasSigning) {
-            throw new ValidationException("Connector '%s' does not implement the '%s' interface required for delegated signing"
-                    .formatted(connector.getName(), ConnectorInterface.SIGNING.getLabel()));
         }
     }
 
@@ -874,24 +877,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     @Transactional(readOnly = true)
     public void evaluatePermissionChain(SecuredUUID uuid) throws NotFoundException {
         findByUuid(uuid);
-    }
-
-    @Override
-    public void notifyTimeQualityConfigurationChange(UUID timeQualityConfigurationUuid) {
-        signingProfileRepository.findAllByTimeQualityConfigurationUuid(timeQualityConfigurationUuid)
-                .forEach(p -> evictSigningProfileCache(p.getName()));
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ──────────────────────────────────────────────────────────────────────────
-
-    private void evictSigningProfileCache(String name) {
-        Cache cache = cacheManager.getCache(CacheConfig.SIGNING_PROFILES_CACHE);
-        if (cache != null) {
-            log.debug("Evicting signing profile cache entry for name '{}'", name);
-            cache.evict(name);
-        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────

@@ -2,18 +2,18 @@ package com.czertainly.core.model.signing.scheme;
 
 import com.czertainly.api.model.client.attribute.RequestAttribute;
 import com.czertainly.api.model.client.signing.profile.scheme.ManagedSigningType;
-import com.czertainly.core.dao.entity.Certificate;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Scheme model for managed signing using a pre-existing static certificate and key pair.
  *
- * @param certificate                  The certificate and associated key(s) used for signing.
+ * @param certificateUuid              UUID of the certificate (and associated key) used for signing.
  * @param signingOperationAttributes   Attributes required for signing operations (such as digest algorithm).
  */
 public record StaticKeyManagedSigning(
-        Certificate certificate,
+        UUID certificateUuid,
         List<RequestAttribute> signingOperationAttributes
 ) implements ManagedSigning {
 

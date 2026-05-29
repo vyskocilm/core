@@ -10,20 +10,17 @@ import com.czertainly.api.model.client.signing.profile.SigningProfileListDto;
 import com.czertainly.api.model.client.signing.profile.SigningProfileRequestDto;
 import com.czertainly.api.model.client.signing.profile.SimplifiedSigningProfileDto;
 import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.api.model.common.attribute.common.BaseAttribute;
 import com.czertainly.api.model.core.certificate.CertificateDto;
 import com.czertainly.api.model.core.signing.SigningProtocol;
+import com.czertainly.api.model.core.signing.signingrecord.SigningRecordListDto;
 import com.czertainly.api.model.client.signing.protocols.tsp.TspActivationDetailDto;
 import com.czertainly.api.model.common.BulkActionMessageDto;
 import com.czertainly.api.model.client.certificate.SearchRequestDto;
 import com.czertainly.api.model.common.PaginationResponseDto;
 import com.czertainly.api.model.core.search.SearchFieldDataByGroupDto;
-import com.czertainly.api.model.core.signing.signingrecord.SigningRecordListDto;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
+import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.model.SecuredList;
@@ -43,20 +40,15 @@ public interface SigningProfileService extends ResourceExtensionService {
 
     SecuredList<SigningProfile> listSigningProfilesAssociatedWithTsp(SecuredUUID tspProfileUuid, SecurityFilter filter);
 
-    void notifyTimeQualityConfigurationChange(UUID timeQualityConfigurationUuid);
-
     SigningProfileDto getSigningProfile(SecuredUUID uuid, Integer version) throws NotFoundException;
 
     SigningProfile getSigningProfileEntity(SecuredUUID uuid) throws NotFoundException;
 
-    List<String> findAllNames();
+    // The model is a sealed generic record whose concrete type parameters are resolved by the caller via pattern matching.
+    @SuppressWarnings("java:S1452")
+    SigningProfileModel<?, ?> getSigningProfileModel(String name) throws NotFoundException;
 
-    /**
-     * Resolves a Signing Profile by name, verifying it uses a timestamping workflow.
-     *
-     * @throws NotFoundException if the profile does not exist or is not configured with a timestamping workflow
-     */
-    SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> getManagedTimestampingProfileModel(String name) throws NotFoundException;
+    List<String> findAllNames();
 
     List<SigningProtocol> listSupportedProtocols(SigningWorkflowType workflowType);
 

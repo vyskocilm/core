@@ -9,9 +9,8 @@ import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
  * <p>Use pattern matching to access type-specific fields:</p>
  * <pre>{@code
  * switch (model.signingScheme()) {
- *     case StaticKeyManagedSigning s -> s.certificate();
- *     case OneTimeKeyManagedSigning o -> o.raProfile();
- *     case DelegatedSigning d -> d.connectorUuid();
+ *     case StaticKeyManagedSigning s -> s.certificateUuid();
+ *     case OneTimeKeyManagedSigning o -> o.raProfileUuid();
  * }
  * }</pre>
  */

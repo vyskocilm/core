@@ -2,7 +2,6 @@ package com.czertainly.core.model.signing.workflow;
 
 import com.czertainly.api.model.client.attribute.RequestAttribute;
 import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,7 +11,7 @@ public final class ManagedTimestampingWorkflowBuilder {
     private UUID signatureFormatterConnectorUuid = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private List<RequestAttribute> signatureFormatterConnectorAttributes = List.of();
     private Boolean isQualifiedTimestamp = false;
-    private TimeQualityConfigurationModel timeQualityConfiguration = null;
+    private UUID timeQualityConfigurationUuid = null;
     private String defaultPolicyId = "1.2.3.4.5";
     private List<String> allowedPolicyIds = List.of();
     private List<DigestAlgorithm> allowedDigestAlgorithms = List.of();
@@ -22,56 +21,56 @@ public final class ManagedTimestampingWorkflowBuilder {
         return new ManagedTimestampingWorkflowBuilder();
     }
 
-    static ManagedTimestampingWorkflow<TimeQualityConfigurationModel> valid() {
+    public static ManagedTimestampingWorkflow valid() {
         return aManagedTimestampingWorkflow().build();
     }
 
-    public ManagedTimestampingWorkflowBuilder signatureFormatterConnectorUuid(UUID signatureFormatterConnectorUuid) {
-        this.signatureFormatterConnectorUuid = signatureFormatterConnectorUuid;
+    public ManagedTimestampingWorkflowBuilder signatureFormatterConnectorUuid(UUID v) {
+        this.signatureFormatterConnectorUuid = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder signatureFormatterConnectorAttributes(List<RequestAttribute> signatureFormatterConnectorAttributes) {
-        this.signatureFormatterConnectorAttributes = signatureFormatterConnectorAttributes;
+    public ManagedTimestampingWorkflowBuilder signatureFormatterConnectorAttributes(List<RequestAttribute> v) {
+        this.signatureFormatterConnectorAttributes = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder isQualifiedTimestamp(Boolean isQualifiedTimestamp) {
-        this.isQualifiedTimestamp = isQualifiedTimestamp;
+    public ManagedTimestampingWorkflowBuilder isQualifiedTimestamp(Boolean v) {
+        this.isQualifiedTimestamp = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder timeQualityConfiguration(TimeQualityConfigurationModel timeQualityConfiguration) {
-        this.timeQualityConfiguration = timeQualityConfiguration;
+    public ManagedTimestampingWorkflowBuilder timeQualityConfigurationUuid(UUID v) {
+        this.timeQualityConfigurationUuid = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder defaultPolicyId(String defaultPolicyId) {
-        this.defaultPolicyId = defaultPolicyId;
+    public ManagedTimestampingWorkflowBuilder defaultPolicyId(String v) {
+        this.defaultPolicyId = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder allowedPolicyIds(List<String> allowedPolicyIds) {
-        this.allowedPolicyIds = allowedPolicyIds;
+    public ManagedTimestampingWorkflowBuilder allowedPolicyIds(List<String> v) {
+        this.allowedPolicyIds = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder allowedDigestAlgorithms(List<DigestAlgorithm> allowedDigestAlgorithms) {
-        this.allowedDigestAlgorithms = allowedDigestAlgorithms;
+    public ManagedTimestampingWorkflowBuilder allowedDigestAlgorithms(List<DigestAlgorithm> v) {
+        this.allowedDigestAlgorithms = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflowBuilder validateTokenSignature(Boolean validateTokenSignature) {
-        this.validateTokenSignature = validateTokenSignature;
+    public ManagedTimestampingWorkflowBuilder validateTokenSignature(Boolean v) {
+        this.validateTokenSignature = v;
         return this;
     }
 
-    public ManagedTimestampingWorkflow<TimeQualityConfigurationModel> build() {
-        return new ManagedTimestampingWorkflow<>(
+    public ManagedTimestampingWorkflow build() {
+        return new ManagedTimestampingWorkflow(
                 signatureFormatterConnectorUuid,
                 signatureFormatterConnectorAttributes,
                 isQualifiedTimestamp,
-                timeQualityConfiguration,
+                timeQualityConfigurationUuid,
                 defaultPolicyId,
                 allowedPolicyIds,
                 allowedDigestAlgorithms,

@@ -68,10 +68,6 @@ public class SigningProfile extends UniquelyIdentifiedAndAudited implements Secu
     @ToString.Exclude
     private List<SigningProfileVersion> versions = new ArrayList<>();
 
-    @OneToMany(mappedBy = "signingProfile", fetch = FetchType.LAZY)
-    @ToString.Exclude
-    private List<SigningRecord> signingRecords = new ArrayList<>();
-
     public void setTimeQualityConfiguration(TimeQualityConfiguration timeQualityConfiguration) {
         this.timeQualityConfiguration = timeQualityConfiguration;
         this.timeQualityConfigurationUuid = timeQualityConfiguration != null ? timeQualityConfiguration.getUuid() : null;
