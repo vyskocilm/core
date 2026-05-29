@@ -7,8 +7,8 @@ import com.czertainly.api.model.common.enums.cryptography.KeyType;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
 import com.czertainly.core.dao.entity.CryptographicKey;
 import com.czertainly.core.dao.entity.CryptographicKeyItem;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.scheme.StaticKeyManagedSigning;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import com.czertainly.core.security.authz.SecuredParentUUID;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.service.CryptographicOperationService;
@@ -27,13 +27,13 @@ public class StaticManagedKeySignerCreator implements SignerCreator {
     }
 
     @Override
-    public boolean supports(SigningSchemeModel signingScheme) {
-        return signingScheme instanceof StaticKeyManagedSigning;
+    public boolean supports(ResolvedManagedScheme signingScheme) {
+        return signingScheme instanceof ResolvedStaticKeyManagedSigning;
     }
 
     @Override
-    public Signer create(SigningSchemeModel signingSchemeModel) throws TspException {
-        StaticKeyManagedSigning signingScheme = (StaticKeyManagedSigning) signingSchemeModel;
+    public Signer create(ResolvedManagedScheme signingSchemeModel) throws TspException {
+        ResolvedStaticKeyManagedSigning signingScheme = (ResolvedStaticKeyManagedSigning) signingSchemeModel;
 
         CryptographicKey key = signingScheme.certificate().getKey();
         if (key == null) {

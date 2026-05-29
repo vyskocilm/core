@@ -2,12 +2,12 @@ package com.czertainly.core.service.tsa.signer;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.model.signing.scheme.DelegatedSigning;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
+import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,14 +17,14 @@ import static org.mockito.Mockito.when;
 
 class SignerFactoryTest {
 
-    private static SigningSchemeModel anyScheme() {
-        return new DelegatedSigning(UUID.randomUUID(), List.of());
+    private static ResolvedManagedScheme anyScheme() {
+        return new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of());
     }
 
     @Test
     void create_returnsSigner_whenCreatorSupportsScheme() throws TspException {
         // given
-        SigningSchemeModel scheme = anyScheme();
+        ResolvedManagedScheme scheme = anyScheme();
         Signer expectedSigner = mock(Signer.class);
         SignerCreator creator = mock(SignerCreator.class);
         when(creator.supports(scheme)).thenReturn(true);
@@ -70,7 +70,7 @@ class SignerFactoryTest {
     @Test
     void create_delegatesToFirstMatchingCreator_whenMultipleCreatorsExist() throws TspException {
         // given — second creator matches but first one is checked first
-        SigningSchemeModel scheme = anyScheme();
+        ResolvedManagedScheme scheme = anyScheme();
         Signer expectedSigner = mock(Signer.class);
 
         SignerCreator first = mock(SignerCreator.class);

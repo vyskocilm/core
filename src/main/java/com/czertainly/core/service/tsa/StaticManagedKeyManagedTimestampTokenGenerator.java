@@ -3,10 +3,7 @@ package com.czertainly.core.service.tsa;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
 import com.czertainly.core.service.tsa.messages.TspRequest;
 import com.czertainly.core.service.tsa.formatter.SignatureFormatterClient;
 import com.czertainly.core.service.tsa.signer.Signer;
@@ -34,9 +31,9 @@ public class StaticManagedKeyManagedTimestampTokenGenerator implements ManagedTi
     }
 
     @Override
-    public TimeStampToken generate(TspRequest request, SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> timestampingProfile, CertificateChain certificateChain, BigInteger serialNumber, Instant genTime) throws TspException {
+    public TimeStampToken generate(TspRequest request, ResolvedManagedTimestampingProfile timestampingProfile, CertificateChain certificateChain, BigInteger serialNumber, Instant genTime) throws TspException {
 
-        Signer signer = signerFactory.create(timestampingProfile.signingScheme());
+        Signer signer = signerFactory.create(timestampingProfile.resolvedScheme());
         SignatureAlgorithm signatureAlgorithm = signer.getSignatureAlgorithm();
 
         byte[] dtbs = formatter.formatDtbs(request, timestampingProfile, serialNumber, genTime,

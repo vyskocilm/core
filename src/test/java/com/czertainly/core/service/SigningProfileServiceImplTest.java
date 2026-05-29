@@ -77,6 +77,7 @@ import com.czertainly.core.dao.entity.TokenInstanceReference;
 import com.czertainly.core.dao.entity.TokenProfile;
 import com.czertainly.core.dao.entity.RaProfile;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
+import com.czertainly.core.dao.entity.signing.SigningRecord;
 import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.repository.CertificateRepository;
 import com.czertainly.core.dao.repository.ConnectorRepository;
@@ -87,6 +88,7 @@ import com.czertainly.core.dao.repository.RaProfileRepository;
 import com.czertainly.core.dao.repository.TokenProfileRepository;
 import com.czertainly.core.dao.repository.signing.SigningProfileRepository;
 import com.czertainly.core.dao.repository.signing.SigningProfileVersionRepository;
+import com.czertainly.core.dao.repository.signing.SigningRecordRepository;
 import com.czertainly.core.dao.repository.signing.TspProfileRepository;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
@@ -135,6 +137,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Optional;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -181,6 +184,9 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     private SigningProfileVersionRepository signingProfileVersionRepository;
 
     @Autowired
+    private SigningRecordRepository signingRecordRepository;
+
+    @Autowired
     private TspProfileRepository tspRepository;
 
     @Autowired
@@ -219,6 +225,20 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
      * A minimal RaProfile used as FK reference in ONE_TIME_KEY managed signing scheme requests.
      */
     private RaProfile raProfile;
+
+    /**
+     * Persists a signing record referencing {@code (profileUuid, version)}. Updates bump the profile version
+     * leniently — only when a signing record already references the current version — so version-snapshot
+     * tests seed a record before each update that must produce a new version.
+     */
+    private void seedSigningRecordForVersion(UUID profileUuid, int version) {
+        SigningRecord record = new SigningRecord();
+        record.setName("seed-" + profileUuid + "-v" + version);
+        record.setSigningProfileUuid(profileUuid);
+        record.setSigningProfileVersion(version);
+        record.setSigningTime(OffsetDateTime.now());
+        signingRecordRepository.saveAndFlush(record);
+    }
 
     /**
      * A token profile used as an FK reference in static-key managed signing scheme requests.
@@ -879,6 +899,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             // given: a profile created with DELEGATED + RAW_SIGNING (version 1), then updated to CONTENT_SIGNING (version 2)
             SigningProfileDto created = signingProfileService.createSigningProfile(buildDelegatedRawRequest("profile-history"));
             SecuredUUID profileUuid = SecuredUUID.fromString(created.getUuid());
+            seedSigningRecordForVersion(profileUuid.getValue(), 1);
             signingProfileService.updateSigningProfile(profileUuid, buildDelegatedContentRequest("profile-history"));
 
             // when: fetch version 1
@@ -1249,6 +1270,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             // given
             SigningProfileRequestDto request = buildDelegatedRawRequest("updated-profile");
             request.setDescription("Updated description");
+            seedSigningRecordForVersion(savedProfile.getUuid(), 1);
 
             // when
             SigningProfileDto dto = signingProfileService.updateSigningProfile(savedProfile.getSecuredUuid(), request);
@@ -1293,6 +1315,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                     ObjectAttributeContentInfo.builder(Resource.SIGNING_PROFILE, profileUuid)
                             .operation(AttributeOperation.SIGN).version(1).build());
             assertFalse(v1Attrs.isEmpty(), "Version 1 signing-op attributes should be stored");
+            seedSigningRecordForVersion(profileUuid, 1);
 
             // when: update to PSS/SHA-512 (bumps to version 2)
             StaticKeyManagedSigningRequestDto schemeV2 = new StaticKeyManagedSigningRequestDto();
@@ -1345,6 +1368,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                             .connector(formatter.getUuid())
                             .operation(AttributeOperation.WORKFLOW_FORMATTER).version(1).build());
             assertFalse(v1AttrsBefore.isEmpty(), "Version 1 formatter attributes should be stored after create");
+            seedSigningRecordForVersion(profileUuid, 1);
 
             // when: update with new formatter attribute value (bumps to version 2)
             ContentSigningWorkflowRequestDto wfV2 = new ContentSigningWorkflowRequestDto();
@@ -1483,8 +1507,10 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             SecuredUUID profileUuid = SecuredUUID.fromString(created.getUuid());
             UUID profileUuidRaw = UUID.fromString(created.getUuid());
 
-            // when
+            // when: a signing record on each current version forces the lenient bump
+            seedSigningRecordForVersion(profileUuidRaw, 1);
             signingProfileService.updateSigningProfile(profileUuid, buildDelegatedContentRequest("multi-bump-profile"));
+            seedSigningRecordForVersion(profileUuidRaw, 2);
             signingProfileService.updateSigningProfile(profileUuid, buildDelegatedTimestampingRequest("multi-bump-profile"));
 
             // then: three snapshot versions exist
@@ -2135,6 +2161,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             updateRequest.setName("versioned-get-sign-attrs");
             updateRequest.setSigningScheme(schemeV2);
             updateRequest.setWorkflow(new RawSigningWorkflowRequestDto());
+            seedSigningRecordForVersion(profileUuid.getValue(), 1);
             signingProfileService.updateSigningProfile(profileUuid, updateRequest);
 
             // when: fetch version 1
@@ -2296,6 +2323,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             updateRequest.setSigningScheme(buildDelegatedScheme());
             updateRequest.setWorkflow(workflowB);
 
+            seedSigningRecordForVersion(profileUuidRaw, 1);
             signingProfileService.updateSigningProfile(profileUuid, updateRequest);
 
             // then: attributes for old formatterA are gone (version 2)

@@ -7,12 +7,18 @@ import com.czertainly.api.model.client.signing.profile.scheme.ManagedSigningType
 import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
 import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
 import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
+import com.czertainly.api.model.core.signing.SigningProtocol;
+import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.dao.entity.signing.SigningProfileVersion;
 import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.repository.signing.SigningProfileRepository;
 import com.czertainly.core.dao.repository.signing.SigningProfileVersionRepository;
 import com.czertainly.core.dao.repository.signing.TspProfileRepository;
+import com.czertainly.core.model.signing.SigningProfileModel;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
+import com.czertainly.core.model.signing.timequality.LocalClockTimeQualityConfiguration;
 import com.czertainly.core.service.tsa.messages.TspRequest;
 import com.czertainly.core.service.tsa.messages.TspResponse;
 import com.czertainly.core.service.tsa.validator.TspRequestValidationException;
@@ -34,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +52,11 @@ class TsaServiceImplTest extends BaseSpringBootTest {
     @MockitoBean
     private ManagedTimestampEngine managedTimestampEngine;
 
+    // The engine is mocked, so signing-profile resolution is irrelevant to these dispatch/validation
+    // tests; mock the resolver too so they need not set up a real signing certificate.
+    @MockitoBean
+    private SigningProfileResolver signingProfileResolver;
+
     @Autowired
     private SigningProfileRepository signingProfileRepository;
 
@@ -53,6 +65,21 @@ class TsaServiceImplTest extends BaseSpringBootTest {
 
     @Autowired
     private TspProfileRepository tspProfileRepository;
+
+    @BeforeEach
+    void stubResolver() throws TspException {
+        // The engine is mocked, so the resolved profile only needs to carry the source profile's name
+        // for the dispatch assertions; echo it back from the model the resolver receives.
+        lenient().when(signingProfileResolver.resolve(any())).thenAnswer(invocation -> {
+            SigningProfileModel<?, ?> model = invocation.getArgument(0);
+            return new ResolvedManagedTimestampingProfile(
+                    model.uuid(), model.name(), model.description(), model.version(), model.enabled(),
+                    List.of(SigningProtocol.TSP), Boolean.FALSE, "1.2.3.4.5",
+                    List.of(), List.of(), false, List.of(),
+                    LocalClockTimeQualityConfiguration.INSTANCE, null,
+                    new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
+        });
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

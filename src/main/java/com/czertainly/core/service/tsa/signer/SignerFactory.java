@@ -2,7 +2,7 @@ package com.czertainly.core.service.tsa.signer;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,7 +19,7 @@ public class SignerFactory {
         this.creators = creators;
     }
 
-    public Signer create(SigningSchemeModel signingScheme) throws TspException {
+    public Signer create(ResolvedManagedScheme signingScheme) throws TspException {
         return creators.stream()
                 .filter(c -> c.supports(signingScheme))
                 .findFirst()

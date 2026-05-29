@@ -3,10 +3,9 @@ package com.czertainly.core.service.tsa;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
 import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.core.service.tsa.messages.TspRequest;
 import com.czertainly.core.service.tsa.messages.TspResponse;
 import com.czertainly.core.service.tsa.certificateprovider.CertificateProviderFactory;
@@ -51,12 +50,11 @@ public class ManagedTimestampEngine {
         this.clockSource = clockSource;
     }
 
-    public TspResponse process(TspRequest request, SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> timestampingProfile) throws TspException {
+    public TspResponse process(TspRequest request, ResolvedManagedTimestampingProfile timestampingProfile) throws TspException {
 
-        SigningSchemeModel signingScheme = timestampingProfile.signingScheme();
+        ResolvedManagedScheme signingScheme = timestampingProfile.resolvedScheme();
         var certificateProvider = certificateProviderFactory.getProvider(signingScheme);
-        var timestampingWorkflow = timestampingProfile.workflow();
-        var timeQualityConfiguration = timestampingWorkflow.timeQualityConfiguration();
+        TimeQualityConfigurationModel timeQualityConfiguration = timestampingProfile.timeQualityConfiguration();
 
         var timeStatus = timeQualityRegister.getStatus(timeQualityConfiguration);
         if (timeStatus == TimeQualityStatus.DEGRADED) {
@@ -66,7 +64,7 @@ public class ManagedTimestampEngine {
             logger.info("Time quality status for profile '{}': {}", timeQualityConfiguration.getName(), timeStatus);
         }
 
-        var validationResult = certificateProvider.validate(signingScheme, timestampingWorkflow.isQualifiedTimestamp());
+        var validationResult = certificateProvider.validate(signingScheme, timestampingProfile.isQualifiedTimestamp());
         if (validationResult instanceof ValidationResult.Nok(
                 TspFailureInfo failureInfo, String logMessage, String clientMessage
         )) {
@@ -81,7 +79,7 @@ public class ManagedTimestampEngine {
 
             var result = tokenGenerator.generate(request, timestampingProfile, certificateChain, serialNumber, genTime);
 
-            if (Boolean.TRUE.equals(timestampingWorkflow.validateTokenSignature())) {
+            if (Boolean.TRUE.equals(timestampingProfile.validateTokenSignature())) {
                 var verifier = new JcaSimpleSignerInfoVerifierBuilder().build(certificateChain.signingCertificate());
                 result.validate(verifier);
             }

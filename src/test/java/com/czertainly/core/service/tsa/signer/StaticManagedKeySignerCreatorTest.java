@@ -6,9 +6,7 @@ import com.czertainly.api.model.common.enums.cryptography.KeyType;
 import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.dao.entity.CryptographicKey;
 import com.czertainly.core.dao.entity.CryptographicKeyItem;
-import com.czertainly.core.model.signing.scheme.DelegatedSigning;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.scheme.StaticKeyManagedSigning;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import com.czertainly.core.service.CryptographicOperationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +20,6 @@ import java.util.Set;
 import static com.czertainly.core.dao.entity.CertificateBuilder.aCertificate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class StaticManagedKeySignerCreatorTest {
@@ -40,21 +37,13 @@ class StaticManagedKeySignerCreatorTest {
     // ── supports ──────────────────────────────────────────────────────────────
 
     @Test
-    void supports_returnsTrue_forStaticKeyManagedSigning() {
+    void supports_returnsTrue_forResolvedStaticKeyManagedSigning() {
         // given
-        StaticKeyManagedSigning scheme = new StaticKeyManagedSigning(aCertificate().build(), List.of());
+        ResolvedStaticKeyManagedSigning scheme = new ResolvedStaticKeyManagedSigning(
+                aCertificate().build(), List.of(), List.of());
 
         // when / then
         assertThat(creator.supports(scheme)).isTrue();
-    }
-
-    @Test
-    void supports_returnsFalse_forOtherSchemes() {
-        // given
-        SigningSchemeModel otherScheme = mock(DelegatedSigning.class);
-
-        // when / then
-        assertThat(creator.supports(otherScheme)).isFalse();
     }
 
     // ── create ────────────────────────────────────────────────────────────────
@@ -62,8 +51,8 @@ class StaticManagedKeySignerCreatorTest {
     @Test
     void create_throwsSystemFailure_whenCertificateHasNoKey() {
         // given — the certificate is not backed by a managed cryptographic key
-        StaticKeyManagedSigning scheme = new StaticKeyManagedSigning(
-                aCertificate().withoutKey().build(), List.of());
+        ResolvedStaticKeyManagedSigning scheme = new ResolvedStaticKeyManagedSigning(
+                aCertificate().withoutKey().build(), List.of(), List.of());
 
         // when / then
         assertThatThrownBy(() -> creator.create(scheme))
@@ -83,7 +72,7 @@ class StaticManagedKeySignerCreatorTest {
         Certificate cert = new Certificate();
         cert.setKey(key);
 
-        StaticKeyManagedSigning scheme = new StaticKeyManagedSigning(cert, List.of());
+        ResolvedStaticKeyManagedSigning scheme = new ResolvedStaticKeyManagedSigning(cert, List.of(), List.of());
 
         // when / then
         assertThatThrownBy(() -> creator.create(scheme))
@@ -96,8 +85,8 @@ class StaticManagedKeySignerCreatorTest {
     void create_throwsSystemFailure_whenKeyHasNoPublicKeyItem() {
         // given — CertificateBuilder.valid() produces a key with only a private key item;
         // the algorithm resolver requires the public key data to determine the signature algorithm
-        StaticKeyManagedSigning scheme = new StaticKeyManagedSigning(
-                aCertificate().build(), List.of());
+        ResolvedStaticKeyManagedSigning scheme = new ResolvedStaticKeyManagedSigning(
+                aCertificate().build(), List.of(), List.of());
 
         // when / then
         assertThatThrownBy(() -> creator.create(scheme))

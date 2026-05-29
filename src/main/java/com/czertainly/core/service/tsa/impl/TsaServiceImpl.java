@@ -2,10 +2,16 @@ package com.czertainly.core.service.tsa.impl;
 
 import com.czertainly.api.exception.NotFoundException;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
+import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
+import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.model.signing.TspProfileModel;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
+import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
+import com.czertainly.core.model.signing.workflow.SigningWorkflow;
 import com.czertainly.core.service.SigningProfileService;
 import com.czertainly.core.service.TspProfileService;
 import com.czertainly.core.service.tsa.ManagedTimestampEngine;
+import com.czertainly.core.service.tsa.SigningProfileResolver;
 import com.czertainly.core.service.tsa.TsaService;
 import com.czertainly.core.service.tsa.messages.TspRequest;
 import com.czertainly.core.service.tsa.messages.TspResponse;
@@ -18,11 +24,13 @@ public class TsaServiceImpl implements TsaService {
     private final TspRequestValidator tspRequestValidator;
     private final TspProfileService tspProfileService;
     private final SigningProfileService signingProfileService;
+    private final SigningProfileResolver signingProfileResolver;
     private final ManagedTimestampEngine managedTimestampEngine;
 
-    public TsaServiceImpl(TspRequestValidator tspRequestValidator, SigningProfileService signingProfileService, TspProfileService tspProfileService, ManagedTimestampEngine managedTimestampEngine) {
+    public TsaServiceImpl(TspRequestValidator tspRequestValidator, SigningProfileService signingProfileService, SigningProfileResolver signingProfileResolver, TspProfileService tspProfileService, ManagedTimestampEngine managedTimestampEngine) {
         this.tspRequestValidator = tspRequestValidator;
         this.signingProfileService = signingProfileService;
+        this.signingProfileResolver = signingProfileResolver;
         this.tspProfileService = tspProfileService;
         this.managedTimestampEngine = managedTimestampEngine;
     }
@@ -35,10 +43,18 @@ public class TsaServiceImpl implements TsaService {
     }
 
     public TspResponse processTspRequestForSigningProfile(String signingProfileName, TspRequest request) throws NotFoundException, TspException {
-        var signingProfile = signingProfileService.getManagedTimestampingProfileModel(signingProfileName);
+        SigningProfileModel<?, ?> signingProfile = signingProfileService.getSigningProfileModel(signingProfileName);
 
-        tspRequestValidator.validate(signingProfile.workflow(), request);
+        SigningWorkflow workflow = signingProfile.workflow();
+        if (!(workflow instanceof ManagedTimestampingWorkflow timestampingWorkflow)) {
+            throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
+                    "Signing Profile '%s' is not a managed timestamping profile (workflow: %s)".formatted(
+                            signingProfileName, workflow.getClass().getSimpleName()),
+                    "The system is misconfigured.");
+        }
+        tspRequestValidator.validate(timestampingWorkflow, request);
 
-        return managedTimestampEngine.process(request, signingProfile);
+        ResolvedManagedTimestampingProfile resolvedProfile = signingProfileResolver.resolve(signingProfile);
+        return managedTimestampEngine.process(request, resolvedProfile);
     }
 }

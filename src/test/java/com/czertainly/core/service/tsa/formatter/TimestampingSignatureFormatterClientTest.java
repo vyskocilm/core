@@ -1,20 +1,20 @@
 package com.czertainly.core.service.tsa.formatter;
 
+import com.czertainly.api.clients.ApiClientConnectorInfo;
 import com.czertainly.api.clients.signing.SignatureFormatterApiClient;
 import com.czertainly.api.exception.ConnectorException;
-import com.czertainly.api.exception.NotFoundException;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
 import com.czertainly.api.model.connector.signatures.formatter.FormatDtbsResponseDto;
 import com.czertainly.api.model.connector.signatures.formatter.FormattedResponseDto;
-import com.czertainly.api.model.core.connector.v2.ConnectorApiClientDtoV2;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
+import com.czertainly.api.model.core.signing.SigningProtocol;
+import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
+import com.czertainly.core.model.signing.timequality.LocalClockTimeQualityConfiguration;
 import com.czertainly.core.service.tsa.CertificateChain;
 import com.czertainly.core.service.tsa.messages.TspRequest;
-import com.czertainly.core.service.v2.ConnectorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,8 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
-import static com.czertainly.core.model.signing.SigningProfileModelBuilder.aSigningProfile;
 import static com.czertainly.core.service.tsa.messages.TspRequestBuilder.aTspRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,11 +40,9 @@ class TimestampingSignatureFormatterClientTest {
 
     @Mock
     private SignatureFormatterApiClient apiClient;
-    @Mock
-    private ConnectorService connectorService;
 
     private TimestampingConnectorSignatureFormatterClient client;
-    private SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ?> profile;
+    private ResolvedManagedTimestampingProfile profile;
     private CertificateChain chain;
 
     private TspRequest request;
@@ -56,9 +54,23 @@ class TimestampingSignatureFormatterClientTest {
     void setUp() {
         client = new TimestampingConnectorSignatureFormatterClient();
         client.setApiClient(apiClient);
-        client.setService(connectorService);
 
-        profile = aSigningProfile().build();
+        profile = new ResolvedManagedTimestampingProfile(
+                UUID.randomUUID(),
+                "test-profile",
+                null,
+                1,
+                true,
+                List.of(SigningProtocol.TSP),
+                Boolean.FALSE,
+                "1.2.3.4.5",
+                List.of(),
+                List.of(),
+                false,
+                List.of(),
+                LocalClockTimeQualityConfiguration.INSTANCE,
+                mock(ApiClientConnectorInfo.class),
+                new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
 
         chain = mock(CertificateChain.class);
         lenient().when(chain.chain()).thenReturn(List.of());
@@ -74,23 +86,8 @@ class TimestampingSignatureFormatterClientTest {
     class FormatDtbs {
 
         @Test
-        void throwsSystemFailure_whenFormatterConnectorNotFound() throws Exception {
-            // given — the formatter connector UUID in the workflow has no registered connector
-            when(connectorService.getConnectorForApiClient(any()))
-                    .thenThrow(new NotFoundException("connector not found"));
-
-            // when / then
-            assertThatThrownBy(() -> client.formatDtbs(request, profile, serialNumber, genTime, chain, SIGNATURE_ALGORITHM))
-                    .isInstanceOf(TspException.class)
-                    .satisfies(ex -> assertThat(((TspException) ex).getFailureInfo())
-                            .isEqualTo(TspFailureInfo.SYSTEM_FAILURE));
-        }
-
-        @Test
         void throwsSystemFailure_whenApiCallFails() throws Exception {
-            // given — the connector is found but the remote call fails
-            when(connectorService.getConnectorForApiClient(any()))
-                    .thenReturn(mock(ConnectorApiClientDtoV2.class));
+            // given — the remote formatter call fails
             when(apiClient.formatDtbs(any(), any()))
                     .thenThrow(new ConnectorException("connection refused"));
 
@@ -108,8 +105,6 @@ class TimestampingSignatureFormatterClientTest {
             FormatDtbsResponseDto responseDto = new FormatDtbsResponseDto();
             responseDto.setDtbs(expectedDtbs);
 
-            when(connectorService.getConnectorForApiClient(any()))
-                    .thenReturn(mock(ConnectorApiClientDtoV2.class));
             when(apiClient.formatDtbs(any(), any())).thenReturn(responseDto);
 
             // when
@@ -129,24 +124,8 @@ class TimestampingSignatureFormatterClientTest {
         private final byte[] signature = {4, 5, 6};
 
         @Test
-        void throwsSystemFailure_whenFormatterConnectorNotFound() throws Exception {
-            // given — the formatter connector UUID in the workflow has no registered connector
-            when(connectorService.getConnectorForApiClient(any()))
-                    .thenThrow(new NotFoundException("connector not found"));
-
-            // when / then
-            assertThatThrownBy(() -> client.formatSigningResponse(
-                    request, profile, serialNumber, genTime, chain, dtbs, signature, SIGNATURE_ALGORITHM))
-                    .isInstanceOf(TspException.class)
-                    .satisfies(ex -> assertThat(((TspException) ex).getFailureInfo())
-                            .isEqualTo(TspFailureInfo.SYSTEM_FAILURE));
-        }
-
-        @Test
         void throwsSystemFailure_whenApiCallFails() throws Exception {
-            // given — connector is found but the remote call fails during response assembly
-            when(connectorService.getConnectorForApiClient(any()))
-                    .thenReturn(mock(ConnectorApiClientDtoV2.class));
+            // given — the remote call fails during response assembly
             when(apiClient.formatSigningResponse(any(), any()))
                     .thenThrow(new ConnectorException("remote assembly failed"));
 
@@ -165,8 +144,6 @@ class TimestampingSignatureFormatterClientTest {
             FormattedResponseDto responseDto = new FormattedResponseDto();
             responseDto.setResponse(expectedToken);
 
-            when(connectorService.getConnectorForApiClient(any()))
-                    .thenReturn(mock(ConnectorApiClientDtoV2.class));
             when(apiClient.formatSigningResponse(any(), any())).thenReturn(responseDto);
 
             // when

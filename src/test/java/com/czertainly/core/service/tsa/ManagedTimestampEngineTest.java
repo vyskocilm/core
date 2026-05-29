@@ -1,10 +1,11 @@
 package com.czertainly.core.service.tsa;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.model.signing.SigningProfileModel;
+import com.czertainly.api.model.core.signing.SigningProtocol;
+import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import com.czertainly.core.model.signing.timequality.LocalClockTimeQualityConfiguration;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.core.service.tsa.certificateprovider.ValidationResult;
 import com.czertainly.core.service.tsa.certificateprovider.CertificateProvider;
 import com.czertainly.core.service.tsa.certificateprovider.CertificateProviderFactory;
@@ -25,9 +26,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigInteger;
+import java.util.List;
+import java.util.UUID;
 
-import static com.czertainly.core.model.signing.SigningProfileModelBuilder.aSigningProfile;
-import static com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflowBuilder.aManagedTimestampingWorkflow;
 import static com.czertainly.core.service.tsa.messages.TspRequestBuilder.aTspRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +53,25 @@ class ManagedTimestampEngineTest {
         engine = new ManagedTimestampEngine(timeQualityRegister, serialNumberGenerator, tokenGenerator, certificateProviderFactory, clock);
     }
 
+    private static ResolvedManagedTimestampingProfile aResolvedProfile(boolean validateTokenSignature) {
+        return new ResolvedManagedTimestampingProfile(
+                UUID.randomUUID(),
+                "test-profile",
+                null,
+                1,
+                true,
+                List.of(SigningProtocol.TSP),
+                Boolean.FALSE,
+                "1.2.3.4.5",
+                List.of(),
+                List.of(),
+                validateTokenSignature,
+                List.of(),
+                LocalClockTimeQualityConfiguration.INSTANCE,
+                null,
+                new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
+    }
+
     @Nested
     class Process {
 
@@ -74,7 +94,7 @@ class ManagedTimestampEngineTest {
             when(tokenGenerator.generate(any(), any(), any(), any(), any())).thenReturn(timestampToken);
 
             // when
-            var response = engine.process(aTspRequest().build(), aSigningProfile().build());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(false));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Granted.class);
@@ -87,7 +107,7 @@ class ManagedTimestampEngineTest {
             when(timeQualityRegister.getStatus(any())).thenReturn(TimeQualityStatus.DEGRADED);
 
             // when
-            var response = engine.process(aTspRequest().build(), aSigningProfile().build());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(false));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Rejected.class);
@@ -102,7 +122,7 @@ class ManagedTimestampEngineTest {
                     .thenReturn(ValidationResult.nok(TspFailureInfo.SYSTEM_FAILURE, "certificate not acceptable", "contact your administrator"));
 
             // when
-            var response = engine.process(aTspRequest().build(), aSigningProfile().build());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(false));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Rejected.class);
@@ -117,7 +137,7 @@ class ManagedTimestampEngineTest {
             when(serialNumberGenerator.generate()).thenThrow(new ClockDriftException("monotonic clock drifted beyond threshold"));
 
             // when
-            var response = engine.process(aTspRequest().build(), aSigningProfile().build());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(false));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Rejected.class);
@@ -132,7 +152,7 @@ class ManagedTimestampEngineTest {
             when(serialNumberGenerator.generate()).thenThrow(new SerialNumberGenerationException("thread interrupted during serial number generation"));
 
             // when
-            var response = engine.process(aTspRequest().build(), aSigningProfile().build());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(false));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Rejected.class);
@@ -149,7 +169,7 @@ class ManagedTimestampEngineTest {
             when(tokenGenerator.generate(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("signing connector unavailable"));
 
             // when
-            var response = engine.process(aTspRequest().build(), aSigningProfile().build());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(false));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Rejected.class);
@@ -169,7 +189,7 @@ class ManagedTimestampEngineTest {
             when(tokenGenerator.generate(any(), any(), any(), any(), any())).thenReturn(tokenWithCert.token());
 
             // when
-            var response = engine.process(aTspRequest().build(), profileWithTokenSignatureValidation());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(true));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Granted.class);
@@ -189,20 +209,11 @@ class ManagedTimestampEngineTest {
             when(tokenGenerator.generate(any(), any(), any(), any(), any())).thenReturn(tokenWithCert.token());
 
             // when
-            var response = engine.process(aTspRequest().build(), profileWithTokenSignatureValidation());
+            var response = engine.process(aTspRequest().build(), aResolvedProfile(true));
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Rejected.class);
             assertThat(((TspResponse.Rejected) response).failureInfo()).isEqualTo(TspFailureInfo.SYSTEM_FAILURE);
-        }
-
-        private SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ?> profileWithTokenSignatureValidation() {
-            return aSigningProfile()
-                    .workflow(aManagedTimestampingWorkflow()
-                            .timeQualityConfiguration(LocalClockTimeQualityConfiguration.INSTANCE)
-                            .validateTokenSignature(true)
-                            .build())
-                    .build();
         }
     }
 

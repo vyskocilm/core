@@ -3,7 +3,7 @@ package com.czertainly.core.service.tsa.certificateprovider;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 
 /**
- * Result of {@link CertificateProvider#validate(com.czertainly.core.model.signing.scheme.SigningSchemeModel, boolean)}.
+ * Result of {@link CertificateProvider#validate(com.czertainly.core.model.signing.resolved.ResolvedManagedScheme, boolean)}.
  *
  * <p>Use pattern matching to handle each case:
  * <pre>{@code

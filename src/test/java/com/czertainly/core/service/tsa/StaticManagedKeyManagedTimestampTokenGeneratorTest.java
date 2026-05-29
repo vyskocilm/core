@@ -3,9 +3,11 @@ package com.czertainly.core.service.tsa;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
+import com.czertainly.api.model.core.signing.SigningProtocol;
+import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
+import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
+import com.czertainly.core.model.signing.timequality.LocalClockTimeQualityConfiguration;
 import com.czertainly.core.service.tsa.formatter.SignatureFormatterClient;
 import com.czertainly.core.service.tsa.signer.Signer;
 import com.czertainly.core.service.tsa.signer.SignerFactory;
@@ -20,8 +22,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
-import static com.czertainly.core.model.signing.SigningProfileModelBuilder.aSigningProfile;
 import static com.czertainly.core.service.tsa.messages.TspRequestBuilder.aTspRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -53,8 +56,23 @@ class StaticManagedKeyManagedTimestampTokenGeneratorTest {
         validTokenBytes = TimestampTokenTestUtil.createTimestampToken().getEncoded();
     }
 
-    private SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ?> aTimestampingProfile() {
-        return aSigningProfile().build();
+    private ResolvedManagedTimestampingProfile aTimestampingProfile() {
+        return new ResolvedManagedTimestampingProfile(
+                UUID.randomUUID(),
+                "test-profile",
+                null,
+                1,
+                true,
+                List.of(SigningProtocol.TSP),
+                Boolean.FALSE,
+                "1.2.3.4.5",
+                List.of(),
+                List.of(),
+                false,
+                List.of(),
+                LocalClockTimeQualityConfiguration.INSTANCE,
+                null,
+                new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
     }
 
     @BeforeEach
@@ -100,7 +118,7 @@ class StaticManagedKeyManagedTimestampTokenGeneratorTest {
         generator.generate(aTspRequest().build(), profile, mock(CertificateChain.class), BigInteger.ONE, Instant.now());
 
         // then
-        verify(signerFactory).create(profile.signingScheme());
+        verify(signerFactory).create(profile.resolvedScheme());
     }
 
     @Test

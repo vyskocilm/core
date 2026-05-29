@@ -2,10 +2,7 @@ package com.czertainly.core.service.tsa.formatter;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
 import com.czertainly.core.service.tsa.messages.TspRequest;
 import com.czertainly.core.service.tsa.CertificateChain;
 
@@ -37,7 +34,7 @@ public interface SignatureFormatterClient {
      * @return DER-encoded SignedAttributes bytes to be signed
      * @throws TspException if BouncyCastle fails to build the draft token
      */
-    byte[] formatDtbs(TspRequest request, SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> timestampingProfile, BigInteger serialNumber,
+    byte[] formatDtbs(TspRequest request, ResolvedManagedTimestampingProfile timestampingProfile, BigInteger serialNumber,
                       Instant genTime, CertificateChain certificateChain,
                       SignatureAlgorithm signatureAlgorithm) throws TspException;
 
@@ -55,7 +52,7 @@ public interface SignatureFormatterClient {
      * @return fully assembled, verifiable TimeStampToken
      * @throws TspException if BouncyCastle fails to assemble the token
      */
-    byte[] formatSigningResponse(TspRequest request, SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> timestampingProfile,
+    byte[] formatSigningResponse(TspRequest request, ResolvedManagedTimestampingProfile timestampingProfile,
                                  BigInteger serialNumber, Instant genTime, CertificateChain certificateChain,
                                  byte[] dtbs, byte[] signature,
                                  SignatureAlgorithm signatureAlgorithm) throws TspException;

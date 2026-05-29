@@ -2,7 +2,6 @@ package com.czertainly.core.service.tsa.formatter;
 
 import com.czertainly.api.clients.signing.SignatureFormatterApiClient;
 import com.czertainly.api.exception.ConnectorException;
-import com.czertainly.api.exception.NotFoundException;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
@@ -10,13 +9,9 @@ import com.czertainly.api.model.connector.signatures.formatter.ExtensionDto;
 import com.czertainly.api.model.connector.signatures.formatter.TimestampingFormatDtbsRequestDto;
 import com.czertainly.api.model.connector.signatures.formatter.TimestampingFormatResponseRequestDto;
 import com.czertainly.api.clients.ApiClientConnectorInfo;
-import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
-import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
-import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
 import com.czertainly.core.service.tsa.CertificateChain;
 import com.czertainly.core.service.tsa.messages.TspRequest;
-import com.czertainly.core.service.v2.ConnectorService;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,50 +29,36 @@ import java.util.List;
 public class TimestampingConnectorSignatureFormatterClient implements SignatureFormatterClient {
 
     private SignatureFormatterApiClient apiClient;
-    private ConnectorService connectorService;
 
     @Autowired
     public void setApiClient(SignatureFormatterApiClient apiClient) {
         this.apiClient = apiClient;
     }
 
-    @Autowired
-    public void setService(ConnectorService service) {
-        this.connectorService = service;
-    }
-
     @Override
     public byte[] formatDtbs(TspRequest request,
-                             SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> timestampingProfile,
+                             ResolvedManagedTimestampingProfile timestampingProfile,
                              BigInteger serialNumber,
                              Instant genTime,
                              CertificateChain certificateChain,
                              SignatureAlgorithm signatureAlgorithm) throws TspException {
 
-        ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel> workflow = timestampingProfile.workflow();
-        ApiClientConnectorInfo connector = null;
-        try {
-            connector = connectorService.getConnectorForApiClient(workflow.signatureFormatterConnectorUuid());
-        } catch (NotFoundException e) {
-            throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
-                    "Signature formatter connector not found: " + workflow.signatureFormatterConnectorUuid(), e,
-                    "Internal error: signing configuration is invalid");
-        }
+        ApiClientConnectorInfo connector = timestampingProfile.signatureFormatterConnector();
 
         TimestampingFormatDtbsRequestDto requestDto = new TimestampingFormatDtbsRequestDto();
         requestDto.setData(request.hashedMessage());
         requestDto.setHashAlgorithm(request.hashAlgorithm());
-        requestDto.setPolicy(request.policy().orElse(workflow.defaultPolicyId()));
+        requestDto.setPolicy(request.policy().orElse(timestampingProfile.defaultPolicyId()));
         requestDto.setNonce(request.nonce().orElse(null));
         requestDto.setIncludeSignerCertificate(request.includeSignerCertificate());
-        requestDto.setQualifiedTimestamp(timestampingProfile.workflow().isQualifiedTimestamp());
+        requestDto.setQualifiedTimestamp(timestampingProfile.isQualifiedTimestamp());
         requestDto.setRequestExtensions(toExtensionDtos(request.requestExtensions()));
         requestDto.setSerialNumber(serialNumber);
         requestDto.setSigningTime(genTime);
-        requestDto.setAccuracy(workflow.timeQualityConfiguration().getAccuracy().orElse(null));
+        requestDto.setAccuracy(timestampingProfile.timeQualityConfiguration().getAccuracy().orElse(null));
         requestDto.setSignatureAlgorithm(signatureAlgorithm);
         requestDto.setCertificateChain(encodeBase64DerChain(certificateChain));
-        requestDto.setFormatAttributes(workflow.signatureFormatterConnectorAttributes());
+        requestDto.setFormatAttributes(timestampingProfile.signatureFormatterConnectorAttributes());
 
         try {
             return apiClient.formatDtbs(connector, requestDto).getDtbs();
@@ -88,7 +69,7 @@ public class TimestampingConnectorSignatureFormatterClient implements SignatureF
 
     @Override
     public byte[] formatSigningResponse(TspRequest request,
-                                        SigningProfileModel<ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel>, ? extends SigningSchemeModel> timestampingProfile,
+                                        ResolvedManagedTimestampingProfile timestampingProfile,
                                         BigInteger serialNumber,
                                         Instant genTime,
                                         CertificateChain certificateChain,
@@ -96,31 +77,23 @@ public class TimestampingConnectorSignatureFormatterClient implements SignatureF
                                         byte[] signature,
                                         SignatureAlgorithm signatureAlgorithm) throws TspException {
 
-        ManagedTimestampingWorkflow<? extends TimeQualityConfigurationModel> workflow = timestampingProfile.workflow();
-        ApiClientConnectorInfo connector = null;
-        try {
-            connector = connectorService.getConnectorForApiClient(workflow.signatureFormatterConnectorUuid());
-        } catch (NotFoundException e) {
-            throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
-                    "Signature formatter connector not found: " + workflow.signatureFormatterConnectorUuid(), null,
-                    "Internal error: signing configuration is invalid");
-        }
+        ApiClientConnectorInfo connector = timestampingProfile.signatureFormatterConnector();
 
         TimestampingFormatResponseRequestDto requestDto = new TimestampingFormatResponseRequestDto();
         requestDto.setDtbs(dtbs);
         requestDto.setSignature(signature);
         requestDto.setCertificateChain(encodeBase64DerChain(certificateChain));
-        requestDto.setFormatAttributes(workflow.signatureFormatterConnectorAttributes());
+        requestDto.setFormatAttributes(timestampingProfile.signatureFormatterConnectorAttributes());
         requestDto.setData(request.hashedMessage());
         requestDto.setHashAlgorithm(request.hashAlgorithm());
-        requestDto.setPolicy(request.policy().orElse(workflow.defaultPolicyId()));
+        requestDto.setPolicy(request.policy().orElse(timestampingProfile.defaultPolicyId()));
         requestDto.setNonce(request.nonce().orElse(null));
         requestDto.setIncludeSignerCertificate(request.includeSignerCertificate());
-        requestDto.setQualifiedTimestamp(timestampingProfile.workflow().isQualifiedTimestamp());
+        requestDto.setQualifiedTimestamp(timestampingProfile.isQualifiedTimestamp());
         requestDto.setRequestExtensions(toExtensionDtos(request.requestExtensions()));
         requestDto.setSerialNumber(serialNumber);
         requestDto.setSigningTime(genTime);
-        requestDto.setAccuracy(workflow.timeQualityConfiguration().getAccuracy().orElse(null));
+        requestDto.setAccuracy(timestampingProfile.timeQualityConfiguration().getAccuracy().orElse(null));
         requestDto.setSignatureAlgorithm(signatureAlgorithm);
 
         try {

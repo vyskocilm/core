@@ -1,7 +1,7 @@
 package com.czertainly.core.service.tsa.signer;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
+import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
 
 /**
  * Creates a {@link Signer} for a specific type of signing scheme.
@@ -9,7 +9,7 @@ import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
  */
 public interface SignerCreator {
 
-    boolean supports(SigningSchemeModel signingScheme);
+    boolean supports(ResolvedManagedScheme signingScheme);
 
-    Signer create(SigningSchemeModel signingScheme) throws TspException;
+    Signer create(ResolvedManagedScheme signingScheme) throws TspException;
 }
