@@ -34,7 +34,6 @@ public class CacheConfig {
     public static final String SYSTEM_USER_AUTH_CACHE = "systemUserAuth";
     public static final String TIME_QUALITY_CONFIGURATION_CACHE = "timeQualityConfiguration";
     public static final String TOKEN_AUTH_CACHE = "tokenAuth";
-    public static final String SIGNING_PROFILES_CACHE = "signingProfiles";
     public static final String TSP_PROFILE_CACHE = "tspProfile";
     public static final String USER_UUID_AUTH_CACHE = "userUuidAuth";
 
@@ -48,8 +47,7 @@ public class CacheConfig {
                                      TokenJtiIndex tokenJtiIndex,
                                      TspProfileCacheProperties tspProfileCacheProperties,
                                      UserCertificateIndex userCertificateIndex) {
-        CaffeineCacheManager mgr = new CaffeineCacheManager(SYSTEM_USER_AUTH_CACHE, USER_UUID_AUTH_CACHE,
-                SIGNING_PROFILES_CACHE);
+        CaffeineCacheManager mgr = new CaffeineCacheManager(SYSTEM_USER_AUTH_CACHE, USER_UUID_AUTH_CACHE);
         mgr.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(authCacheProperties.ttlMinutes(), TimeUnit.MINUTES)
                 .maximumSize(authCacheProperties.maxSize())
