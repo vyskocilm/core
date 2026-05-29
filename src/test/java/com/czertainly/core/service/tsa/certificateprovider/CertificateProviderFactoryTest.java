@@ -3,7 +3,6 @@ package com.czertainly.core.service.tsa.certificateprovider;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.core.model.signing.scheme.DelegatedSigning;
-import com.czertainly.core.model.signing.scheme.SigningSchemeModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

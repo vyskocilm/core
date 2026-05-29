@@ -1,6 +1,7 @@
 package com.czertainly.core.util.builders;
 
 import com.czertainly.api.model.client.attribute.RequestAttribute;
+import com.czertainly.api.model.client.signing.protocols.tsp.TspProfileDto;
 import com.czertainly.api.model.client.signing.protocols.tsp.TspProfileRequestDto;
 
 import java.util.List;
@@ -15,6 +16,16 @@ public class TspProfileRequestDtoBuilder {
 
     public static TspProfileRequestDtoBuilder aTspProfileRequest() {
         return new TspProfileRequestDtoBuilder();
+    }
+
+    public static TspProfileRequestDtoBuilder aTspProfileRequestFromProfile(TspProfileDto profile) {
+        TspProfileRequestDtoBuilder builder = new TspProfileRequestDtoBuilder();
+        builder.name = profile.getName();
+        builder.description = profile.getDescription();
+        builder.defaultSigningProfileUuid = profile.getDefaultSigningProfile() != null
+                ? UUID.fromString(profile.getDefaultSigningProfile().getUuid())
+                : null;
+        return builder;
     }
 
     public TspProfileRequestDtoBuilder withName(String name) {
