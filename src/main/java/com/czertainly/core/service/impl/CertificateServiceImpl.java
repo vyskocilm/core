@@ -75,11 +75,7 @@ import com.czertainly.core.service.*;
 import com.czertainly.core.service.writer.CertificateValidationWriter;
 import com.czertainly.core.service.v2.ConnectorService;
 import com.czertainly.core.service.v2.ExtendedAttributeService;
-import com.czertainly.core.config.cache.CacheConfig;
 import com.czertainly.core.settings.SettingsCache;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.Cacheable;
 import com.czertainly.core.util.*;
 import com.czertainly.core.validation.certificate.ICertificateValidator;
 import jakarta.persistence.criteria.*;
@@ -182,7 +178,6 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
     private CertificateProtocolAssociationRepository certificateProtocolAssociationRepository;
     private ApplicationEventPublisher applicationEventPublisher;
     private ValidationProducer validationProducer;
-    private CacheManager cacheManager;
     private AuthenticationCache authenticationCache;
     private CertificateUploadService certificateUploadService;
 
@@ -386,11 +381,6 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
     }
 
     @Autowired
-    public void setCacheManager(CacheManager cacheManager) {
-        this.cacheManager = cacheManager;
-    }
-
-    @Autowired
     public void setAuthenticationCache(AuthenticationCache authenticationCache) {
         this.authenticationCache = authenticationCache;
     }
@@ -564,7 +554,6 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
             certificateContentRepository.delete(content);
             certificate.setCertificateContent(null);
         }
-        evictCertificateChainCache();
     }
 
     @Override
@@ -722,8 +711,6 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
 
         certificateRepository.deleteAllInBatch(certificates);
         certificateContentRepository.deleteUnusedCertificateContents();
-        evictCertificateChainCache();
-
         return certificates.size();
     }
 
@@ -2071,13 +2058,6 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
 
     private void setupSecurityFilter(SecurityFilter filter) {
         filter.setParentRefProperty(Certificate_.raProfileUuid.getName());
-    }
-
-    private void evictCertificateChainCache() {
-        Cache cache = cacheManager.getCache(CacheConfig.CERTIFICATE_CHAIN_CACHE);
-        if (cache != null) {
-            cache.clear();
-        }
     }
 
     private ICertificateValidator getCertificateValidator(CertificateType certificateType) {
