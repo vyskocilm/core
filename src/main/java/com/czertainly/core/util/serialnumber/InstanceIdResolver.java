@@ -32,7 +32,7 @@ import java.util.function.Supplier;
  * triggers a warning. Cross-cluster collisions cannot be detected at runtime.
  * Set {@code ILM_INSTANCE_ID} explicitly whenever the above conditions apply.
  */
-    final class InstanceIdResolver {
+final class InstanceIdResolver {
 
     static final String INSTANCE_ID_ENV_VAR = "ILM_INSTANCE_ID";
 

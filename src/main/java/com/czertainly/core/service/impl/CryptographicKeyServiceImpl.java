@@ -949,7 +949,6 @@ public class CryptographicKeyServiceImpl implements CryptographicKeyService {
         }
         UUID tokenInstanceUuid = UUID.fromString(tokenInstanceReference.getTokenInstanceUuid());
 
-
         CryptographicKeyItemModel model = new CryptographicKeyItemModel(
                 keyItem.getUuid(),
                 keyItem.getState(),
