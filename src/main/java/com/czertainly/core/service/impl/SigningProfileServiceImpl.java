@@ -39,7 +39,7 @@ import com.czertainly.api.model.core.search.SearchFieldDataByGroupDto;
 import com.czertainly.api.model.core.search.SearchFieldDataDto;
 import com.czertainly.core.comparator.SearchFieldDataComparator;
 import com.czertainly.core.config.cache.CacheConfig;
-import com.czertainly.core.config.cache.CacheEvictions;
+import com.czertainly.core.config.cache.CacheEvictor;
 import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.util.SearchHelper;
@@ -89,7 +89,6 @@ import jakarta.persistence.criteria.Root;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.function.TriFunction;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
@@ -127,7 +126,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     private TspProfileService tspProfileService;
     private AttributeEngine attributeEngine;
     private ConnectorApiFactory connectorApiFactory;
-    private CacheManager cacheManager;
+    private CacheEvictor cacheEvictor;
 
     // ──────────────────────────────────────────────────────────────────────────
     // List / search
@@ -285,7 +284,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
      * {@code NOT_SUPPORTED} create path) evict immediately.
      */
     private void evictSigningProfileCache(String name) {
-        CacheEvictions.evictAfterCommit(cacheManager.getCache(CacheConfig.SIGNING_PROFILE_CACHE), name);
+        cacheEvictor.evict(CacheConfig.SIGNING_PROFILE_CACHE, name);
     }
 
     @Override
@@ -890,8 +889,8 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     }
 
     @Autowired
-    public void setCacheManager(CacheManager cacheManager) {
-        this.cacheManager = cacheManager;
+    public void setCacheEvictor(CacheEvictor cacheEvictor) {
+        this.cacheEvictor = cacheEvictor;
     }
 
     @Autowired
