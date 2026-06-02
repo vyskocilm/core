@@ -9,6 +9,8 @@ import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.dao.entity.CryptographicKey;
 import com.czertainly.core.dao.entity.CryptographicKeyItem;
 import com.czertainly.core.dao.entity.TokenProfile;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModel;
+import com.czertainly.core.model.signing.SigningCertificate;
 import com.czertainly.core.oid.OidHandler;
 import com.czertainly.core.util.MetaDefinitions;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -22,11 +24,13 @@ import java.io.IOException;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 class CertificateUtilTest {
 
@@ -345,5 +349,52 @@ class CertificateUtilTest {
         }
 
         Assertions.assertEquals(expectedResult, CertificateUtil.isCertificateDigitalSigningAcceptable(certificate, workflowType, qualifiedTimestamp), "Test case '" + testCaseName + "' failed");
+    }
+
+    @ParameterizedTest
+    @MethodSource("com.czertainly.core.util.CertificateTestData#provideDigitalSigningAcceptableTestData")
+    void testIsCertificateDigitalSigningAcceptable_recordOverload(
+            String testCaseName,
+            List<CertificateTestData.KeyItemData> publicKeys,
+            List<CertificateTestData.KeyItemData> privateKeys,
+            CertificateState certificateState, CertificateValidationStatus validationStatus, boolean archived,
+            boolean withTokenProfile, List<String> extendedKeyUsages, boolean extendedKeyUsageCritical,
+            SigningWorkflowType workflowType, boolean qualifiedTimestamp, Boolean qcCompliance,
+            boolean expectedResult
+    ) {
+        boolean hasKey = !publicKeys.isEmpty() || !privateKeys.isEmpty();
+
+        List<CryptographicKeyItemModel> keyItems = new ArrayList<>();
+        for (CertificateTestData.KeyItemData keyData : publicKeys) {
+            keyItems.add(toKeyItemModel(keyData));
+        }
+        for (CertificateTestData.KeyItemData keyData : privateKeys) {
+            keyItems.add(toKeyItemModel(keyData));
+        }
+
+        SigningCertificate certificate = new SigningCertificate(
+                UUID.randomUUID(),
+                "cn",
+                archived,
+                certificateState,
+                validationStatus,
+                List.copyOf(extendedKeyUsages),
+                extendedKeyUsageCritical,
+                qcCompliance,
+                hasKey ? UUID.randomUUID() : null,
+                UUID.randomUUID(),
+                (hasKey && withTokenProfile) ? UUID.randomUUID() : null,
+                keyItems.stream().map(CryptographicKeyItemModel::keyItemUuid).toList()
+        );
+
+        Assertions.assertEquals(expectedResult,
+                CertificateUtil.isCertificateDigitalSigningAcceptable(certificate, keyItems, workflowType, qualifiedTimestamp),
+                "Test case '" + testCaseName + "' failed");
+    }
+
+    private static CryptographicKeyItemModel toKeyItemModel(CertificateTestData.KeyItemData keyData) {
+        return new CryptographicKeyItemModel(
+                UUID.randomUUID(), true, keyData.algorithm(), keyData.state(), keyData.type(), keyData.usage(),
+                null, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
     }
 }

@@ -2,7 +2,7 @@ package com.czertainly.core.service.tsa.certificateprovider;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.SigningCertificateBuilder;
 import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
 import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,7 @@ class CertificateProviderFactoryTest {
     CertificateProvider nonSupportingProvider;
 
     private static ResolvedManagedScheme anyScheme() {
-        return new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of());
+        return new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), List.of(), List.of(), List.of());
     }
 
     // ── getProvider() ─────────────────────────────────────────────────────────

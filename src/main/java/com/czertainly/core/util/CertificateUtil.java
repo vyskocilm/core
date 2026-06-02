@@ -10,6 +10,8 @@ import com.czertainly.api.model.core.compliance.ComplianceStatus;
 import com.czertainly.api.model.core.cryptography.key.KeyState;
 import com.czertainly.api.model.core.cryptography.key.KeyUsage;
 import com.czertainly.api.model.core.oid.SystemOid;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModel;
+import com.czertainly.core.model.signing.SigningCertificate;
 import com.czertainly.api.model.core.settings.CertificateValidationSettingsDto;
 import com.czertainly.api.model.core.settings.PlatformSettingsDto;
 import com.czertainly.api.model.core.settings.SettingsSection;
@@ -931,42 +933,112 @@ public class CertificateUtil {
      * @return {@code true} iff all applicable requirements are satisfied
      */
     public static boolean isCertificateDigitalSigningAcceptable(Certificate certificate, SigningWorkflowType workflowType, boolean qualifiedTimestamp) {
-        if (certificate.isArchived()) return false;
-        if (certificate.getKey() == null ||
-                certificate.getState() != CertificateState.ISSUED ||
-                (certificate.getValidationStatus() != CertificateValidationStatus.VALID
-                        && certificate.getValidationStatus() != CertificateValidationStatus.EXPIRING)
+        List<SigningPrivateKeyView> privateKeys = new ArrayList<>();
+        if (certificate.getKey() != null) {
+            for (CryptographicKeyItem item : certificate.getKey().getItems()) {
+                if (item.getType() == KeyType.PRIVATE_KEY) {
+                    privateKeys.add(new SigningPrivateKeyView(item.getState(), item.getUsage()));
+                }
+            }
+        }
+        SigningAcceptabilityView view = new SigningAcceptabilityView(
+                certificate.isArchived(),
+                certificate.getKey() != null,
+                certificate.getKey() != null && certificate.getKey().getTokenProfile() != null,
+                certificate.getState(),
+                certificate.getValidationStatus(),
+                privateKeys,
+                MetaDefinitions.deserializeArrayString(certificate.getExtendedKeyUsage()),
+                Boolean.TRUE.equals(certificate.getExtendedKeyUsageCritical()),
+                Boolean.TRUE.equals(certificate.getQcCompliance())
+        );
+        return isCertificateDigitalSigningAcceptable(view, workflowType, qualifiedTimestamp);
+    }
+
+    /**
+     * Cache-backed counterpart of {@link #isCertificateDigitalSigningAcceptable(Certificate, SigningWorkflowType, boolean)}.
+     * Evaluates the same acceptability rules against the {@link SigningCertificate} snapshot and its
+     * {@link CryptographicKeyItemModel} key items instead of the JPA entity graph.
+     *
+     * @param certificate        the cached certificate snapshot
+     * @param keyItems           the cached key-item snapshots for the certificate's key
+     * @param workflowType       the signing workflow
+     * @param qualifiedTimestamp when {@code true} and workflow is TIMESTAMPING, also requires id-etsi-qcs-QcCompliance
+     * @return {@code true} iff all applicable requirements are satisfied
+     */
+    public static boolean isCertificateDigitalSigningAcceptable(SigningCertificate certificate, List<CryptographicKeyItemModel> keyItems,
+                                                                SigningWorkflowType workflowType, boolean qualifiedTimestamp) {
+        List<SigningPrivateKeyView> privateKeys = new ArrayList<>();
+        for (CryptographicKeyItemModel item : keyItems) {
+            if (item.keyType() == KeyType.PRIVATE_KEY) {
+                privateKeys.add(new SigningPrivateKeyView(item.keyState(), item.keyUsage()));
+            }
+        }
+        SigningAcceptabilityView view = new SigningAcceptabilityView(
+                certificate.archived(),
+                certificate.keyUuid() != null,
+                certificate.tokenProfileUuid() != null,
+                certificate.state(),
+                certificate.validationStatus(),
+                privateKeys,
+                certificate.extendedKeyUsageOids(),
+                Boolean.TRUE.equals(certificate.extendedKeyUsageCritical()),
+                Boolean.TRUE.equals(certificate.qcCompliance())
+        );
+        return isCertificateDigitalSigningAcceptable(view, workflowType, qualifiedTimestamp);
+    }
+
+    /**
+     * Inputs the digital-signing acceptability rule reads, decoupled from the backing data source (JPA entity graph
+     * vs cached {@link SigningCertificate} snapshot).
+     */
+    private record SigningAcceptabilityView(
+            boolean archived,
+            boolean hasKey,
+            boolean hasTokenProfile,
+            CertificateState state,
+            CertificateValidationStatus validationStatus,
+            List<SigningPrivateKeyView> privateKeys,
+            List<String> extendedKeyUsageOids,
+            boolean extendedKeyUsageCritical,
+            boolean qcCompliant
+    ) {}
+
+    private record SigningPrivateKeyView(KeyState state, List<KeyUsage> usage) {}
+
+    private static boolean isCertificateDigitalSigningAcceptable(SigningAcceptabilityView view, SigningWorkflowType workflowType, boolean qualifiedTimestamp) {
+        if (view.archived()) return false;
+        if (!view.hasKey()
+                || view.state() != CertificateState.ISSUED
+                || (view.validationStatus() != CertificateValidationStatus.VALID
+                        && view.validationStatus() != CertificateValidationStatus.EXPIRING)
         ) {
             return false;
         }
 
         // The associated CryptographicKey must have a Token Profile assigned.
-        if (certificate.getKey().getTokenProfile() == null) return false;
+        if (!view.hasTokenProfile()) return false;
 
         // All private keys must be ACTIVE and carry the SIGN usage.
         // Other key types (split keys, secret keys) do not apply to certificate signing.
-        boolean privateKeyAvailable = false;
-        for (CryptographicKeyItem item : certificate.getKey().getItems()) {
-            if (item.getType().equals(KeyType.PRIVATE_KEY)) {
-                if (item.getState() != KeyState.ACTIVE || !item.getUsage().contains(KeyUsage.SIGN)) {
-                    return false;
-                }
-                privateKeyAvailable = true;
+        if (view.privateKeys().isEmpty()) return false;
+        for (SigningPrivateKeyView key : view.privateKeys()) {
+            if (key.state() != KeyState.ACTIVE || !key.usage().contains(KeyUsage.SIGN)) {
+                return false;
             }
         }
-        if (!privateKeyAvailable) return false;
 
         if (workflowType == SigningWorkflowType.TIMESTAMPING) {
             // RFC 3161: the EKU extension MUST contain only id-kp-timeStamping and MUST be critical.
-            List<String> ekuOids = MetaDefinitions.deserializeArrayString(certificate.getExtendedKeyUsage());
+            List<String> ekuOids = view.extendedKeyUsageOids();
             boolean ekuCompliant = ekuOids.size() == 1
                     && ekuOids.contains(SystemOid.TIME_STAMPING.getOid())
-                    && Boolean.TRUE.equals(certificate.getExtendedKeyUsageCritical());
+                    && view.extendedKeyUsageCritical();
             if (!ekuCompliant) return false;
 
             // ETSI EN 319 421 §6.2: for a qualified TSA the signer certificate MUST carry the
             // id-etsi-qcs-QcCompliance statement (OID 0.4.0.1862.1.1, ETSI EN 319 412-5).
-            return !qualifiedTimestamp || Boolean.TRUE.equals(certificate.getQcCompliance());
+            return !qualifiedTimestamp || view.qcCompliant();
         }
 
         return true;

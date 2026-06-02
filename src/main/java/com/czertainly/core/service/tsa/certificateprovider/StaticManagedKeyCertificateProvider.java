@@ -24,7 +24,7 @@ public class StaticManagedKeyCertificateProvider implements CertificateProvider 
                     "The signing scheme '%s' is not supported by 'StaticManagedKeyCertificateProvider'.".formatted(signingScheme.getClass().getSimpleName()),
                     "The system is misconfigured.");
         }
-        if (!CertificateUtil.isCertificateDigitalSigningAcceptable(signingSchemeModel.certificate(), SigningWorkflowType.TIMESTAMPING, qualifiedTimestamp)) {
+        if (!CertificateUtil.isCertificateDigitalSigningAcceptable(signingSchemeModel.certificate(), signingSchemeModel.keyItems(), SigningWorkflowType.TIMESTAMPING, qualifiedTimestamp)) {
             return ValidationResult.nok(TspFailureInfo.SYSTEM_FAILURE,
                     "Signer certificate is not acceptable for %s timestamping".formatted(qualifiedTimestamp ? "qualified" : "non-qualified"),
                     "Signer certificate failed validation.");
@@ -42,7 +42,7 @@ public class StaticManagedKeyCertificateProvider implements CertificateProvider 
 
         if (signingSchemeModel.chain().isEmpty()) {
             throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
-                    "Signing certificate or its chain is not available for UUID %s.".formatted(signingSchemeModel.certificate().getUuid()),
+                    "Signing certificate or its chain is not available for UUID %s.".formatted(signingSchemeModel.certificate().uuid()),
                     "Signing key certificate could not be found.");
         }
         return CertificateChain.of(signingSchemeModel.chain());

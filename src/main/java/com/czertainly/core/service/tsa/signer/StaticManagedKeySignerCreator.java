@@ -5,8 +5,8 @@ import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.client.attribute.RequestAttribute;
 import com.czertainly.api.model.common.enums.cryptography.KeyType;
 import com.czertainly.api.model.common.enums.cryptography.SignatureAlgorithm;
-import com.czertainly.core.dao.entity.CryptographicKey;
-import com.czertainly.core.dao.entity.CryptographicKeyItem;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModel;
+import com.czertainly.core.model.signing.SigningCertificate;
 import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
 import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import com.czertainly.core.security.authz.SecuredParentUUID;
@@ -35,39 +35,41 @@ public class StaticManagedKeySignerCreator implements SignerCreator {
     public Signer create(ResolvedManagedScheme signingSchemeModel) throws TspException {
         ResolvedStaticKeyManagedSigning signingScheme = (ResolvedStaticKeyManagedSigning) signingSchemeModel;
 
-        CryptographicKey key = signingScheme.certificate().getKey();
-        if (key == null) {
+        SigningCertificate certificate = signingScheme.certificate();
+        if (certificate.keyUuid() == null) {
             throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
-                    String.format("No cryptographic key associated with certificate '%s'", signingScheme.certificate().getCommonName()),
+                    String.format("No cryptographic key associated with certificate '%s'", certificate.commonName()),
                     "Signing key could not be found.");
         }
 
-        CryptographicKeyItem privateKeyItem = key.getItems().stream()
-                .filter(item -> item.getType() == KeyType.PRIVATE_KEY)
+        List<CryptographicKeyItemModel> keyItems = signingScheme.keyItems();
+
+        CryptographicKeyItemModel privateKeyItem = keyItems.stream()
+                .filter(item -> item.keyType() == KeyType.PRIVATE_KEY)
                 .findFirst()
                 .orElseThrow(() -> new TspException(TspFailureInfo.SYSTEM_FAILURE,
-                        String.format("No private key item found for key '%s'", key.getUuid()),
+                        String.format("No private key item found for key '%s'", certificate.keyUuid()),
                         "Signing key could not be found."));
 
-        CryptographicKeyItem publicKeyItem = key.getItems().stream()
-                .filter(item -> item.getType() == KeyType.PUBLIC_KEY)
+        CryptographicKeyItemModel publicKeyItem = keyItems.stream()
+                .filter(item -> item.keyType() == KeyType.PUBLIC_KEY)
                 .findFirst()
                 .orElseThrow(() -> new TspException(TspFailureInfo.SYSTEM_FAILURE,
-                        String.format("No public key item found for key '%s'", key.getUuid()),
+                        String.format("No public key item found for key '%s'", certificate.keyUuid()),
                         "Signing key could not be found."));
 
         List<RequestAttribute> requestAttributes = signingScheme.signingOperationAttributes();
 
         String algorithmName = CryptographyUtil.resolveSignatureAlgorithmName(
-                privateKeyItem.getKeyAlgorithm(), publicKeyItem.getKeyData(), requestAttributes);
+                privateKeyItem.keyAlgorithm(), requestAttributes, publicKeyItem.pqcParameterSpecName());
         SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.findByCode(algorithmName);
 
         return new CryptographicOperationServiceSigner(
                 cryptographicOperationService,
-                SecuredParentUUID.fromUUID(key.getTokenInstanceReferenceUuid()),
-                SecuredUUID.fromUUID(key.getTokenProfileUuid()),
-                key.getUuid(),
-                privateKeyItem.getUuid(),
+                SecuredParentUUID.fromUUID(certificate.tokenInstanceReferenceUuid()),
+                SecuredUUID.fromUUID(certificate.tokenProfileUuid()),
+                certificate.keyUuid(),
+                privateKeyItem.keyItemUuid(),
                 requestAttributes,
                 signatureAlgorithm
         );

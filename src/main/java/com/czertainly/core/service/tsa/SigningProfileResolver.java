@@ -4,8 +4,8 @@ import com.czertainly.api.clients.ApiClientConnectorInfo;
 import com.czertainly.api.exception.NotFoundException;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.dao.entity.Certificate;
-import com.czertainly.core.dao.entity.CryptographicKey;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModel;
+import com.czertainly.core.model.signing.SigningCertificate;
 import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.model.signing.resolved.ResolvedManagedScheme;
 import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
@@ -16,22 +16,21 @@ import com.czertainly.core.model.signing.timequality.LocalClockTimeQualityConfig
 import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
 import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.core.model.signing.workflow.SigningWorkflow;
-import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.service.CertificateService;
+import com.czertainly.core.service.CryptographicKeyService;
 import com.czertainly.core.service.TimeQualityConfigurationService;
 import com.czertainly.core.service.v2.ConnectorService;
-import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Resolves a cached, UUID-only {@link SigningProfileModel} into the transient, entity-bearing
+ * Resolves a cached, UUID-only {@link SigningProfileModel} into the transient
  * {@link ResolvedManagedTimestampingProfile} consumed by the timestamping pipeline.
  *
  * <p>The cached model deliberately holds only UUIDs for objects owned by other caches or
@@ -45,10 +44,10 @@ import java.util.UUID;
 public class SigningProfileResolver {
 
     private CertificateService certificateService;
+    private CryptographicKeyService cryptographicKeyService;
     private TimeQualityConfigurationService timeQualityConfigurationService;
     private ConnectorService connectorService;
 
-    @Transactional(readOnly = true)
     public ResolvedManagedTimestampingProfile resolve(SigningProfileModel<?, ?> model) throws TspException {
         SigningWorkflow workflow = model.workflow();
         if (!(workflow instanceof ManagedTimestampingWorkflow timestampingWorkflow)) {
@@ -91,20 +90,17 @@ public class SigningProfileResolver {
         }
 
         UUID certificateUuid = staticKey.certificateUuid();
-        Certificate certificate;
+        SigningCertificate certificate;
+        List<CryptographicKeyItemModel> keyItems = new ArrayList<>();
         try {
-            certificate = certificateService.getCertificateEntity(SecuredUUID.fromUUID(certificateUuid));
+            certificate = certificateService.getSigningCertificate(certificateUuid);
+            for (UUID keyItemUuid : certificate.keyItemUuids()) {
+                keyItems.add(cryptographicKeyService.getKeyItemModel(keyItemUuid));
+            }
         } catch (NotFoundException e) {
             throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
                     "Signing certificate not found: " + certificateUuid, e,
                     "Signing key certificate could not be found.");
-        }
-        // Eagerly initialize the signing-relevant lazy graph while the session is open, so the detached
-        // Certificate remains usable in the (transaction-less) timestamping pipeline downstream.
-        CryptographicKey key = certificate.getKey();
-        if (key != null) {
-            Hibernate.initialize(key.getTokenProfile());
-            Hibernate.initialize(key.getItems());
         }
 
         List<X509Certificate> chain;
@@ -121,7 +117,7 @@ public class SigningProfileResolver {
                     "Signing key certificate could not be found.");
         }
 
-        return new ResolvedStaticKeyManagedSigning(certificate, chain, staticKey.signingOperationAttributes());
+        return new ResolvedStaticKeyManagedSigning(certificate, List.copyOf(keyItems), chain, staticKey.signingOperationAttributes());
     }
 
     private TimeQualityConfigurationModel resolveTimeQualityConfiguration(UUID timeQualityConfigurationUuid) throws TspException {
@@ -151,6 +147,11 @@ public class SigningProfileResolver {
     @Autowired
     public void setCertificateService(CertificateService certificateService) {
         this.certificateService = certificateService;
+    }
+
+    @Autowired
+    public void setCryptographicKeyService(CryptographicKeyService cryptographicKeyService) {
+        this.cryptographicKeyService = cryptographicKeyService;
     }
 
     @Autowired

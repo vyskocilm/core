@@ -3,7 +3,8 @@ package com.czertainly.core.model.signing.resolved;
 import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
 import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
 import com.czertainly.api.model.core.signing.SigningProtocol;
-import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.SigningCertificate;
+import com.czertainly.core.model.signing.SigningCertificateBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,7 +24,7 @@ class ResolvedSigningProfileTest {
     @Test
     void resolvedManagedTimestampingProfile_carriesAllFields_andReportsTimestampingWorkflowType() {
         ResolvedStaticKeyManagedSigning scheme = new ResolvedStaticKeyManagedSigning(
-                new Certificate(), List.of(), List.of());
+                SigningCertificateBuilder.valid(), List.of(), List.of(), List.of());
 
         ResolvedManagedTimestampingProfile profile = new ResolvedManagedTimestampingProfile(
                 PROFILE_UUID,
@@ -67,7 +68,7 @@ class ResolvedSigningProfileTest {
                 PROFILE_UUID, "n", null, 1, false, List.of(),
                 false, null, List.of(), List.of(), null,
                 List.of(), null, null,
-                new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
+                new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), List.of(), List.of(), List.of()));
 
         assertInstanceOf(ResolvedManagedTimestampingProfile.class, profile);
         assertEquals(SigningWorkflowType.TIMESTAMPING, profile.workflowType());
@@ -75,11 +76,12 @@ class ResolvedSigningProfileTest {
 
     @Test
     void resolvedStaticKeyManagedSigning_carriesCertificateAndChain() {
-        Certificate cert = new Certificate();
+        SigningCertificate cert = SigningCertificateBuilder.valid();
         ResolvedStaticKeyManagedSigning scheme = new ResolvedStaticKeyManagedSigning(
-                cert, List.of(), List.of());
+                cert, List.of(), List.of(), List.of());
 
         assertSame(cert, scheme.certificate());
+        assertNotNull(scheme.keyItems());
         assertNotNull(scheme.chain());
         assertNotNull(scheme.signingOperationAttributes());
     }
@@ -87,7 +89,7 @@ class ResolvedSigningProfileTest {
     @Test
     void resolvedStaticKeyManagedSigning_isResolvedManagedScheme() {
         ResolvedManagedScheme scheme = new ResolvedStaticKeyManagedSigning(
-                new Certificate(), List.of(), List.of());
+                SigningCertificateBuilder.valid(), List.of(), List.of(), List.of());
 
         assertInstanceOf(ResolvedStaticKeyManagedSigning.class, scheme);
     }

@@ -2,7 +2,7 @@ package com.czertainly.core.service.tsa;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.core.signing.SigningProtocol;
-import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.SigningCertificateBuilder;
 import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
 import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import com.czertainly.core.model.signing.timequality.LocalClockTimeQualityConfiguration;
@@ -69,7 +69,7 @@ class ManagedTimestampEngineTest {
                 List.of(),
                 LocalClockTimeQualityConfiguration.INSTANCE,
                 null,
-                new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
+                new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), List.of(), List.of(), List.of()));
     }
 
     @Nested

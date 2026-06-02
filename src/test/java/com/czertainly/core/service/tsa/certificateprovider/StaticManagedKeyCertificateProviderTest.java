@@ -2,8 +2,11 @@ package com.czertainly.core.service.tsa.certificateprovider;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
+import com.czertainly.api.model.common.enums.cryptography.KeyAlgorithm;
 import com.czertainly.api.model.core.certificate.CertificateState;
-import com.czertainly.core.dao.entity.CertificateBuilder;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModel;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModelFixtures;
+import com.czertainly.core.model.signing.SigningCertificateBuilder;
 import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
 import com.czertainly.core.service.tsa.CertificateChain;
 import com.czertainly.core.util.CertificateTestUtil;
@@ -19,13 +22,17 @@ class StaticManagedKeyCertificateProviderTest {
 
     private final StaticManagedKeyCertificateProvider provider = new StaticManagedKeyCertificateProvider();
 
+    private static final List<CryptographicKeyItemModel> SIGNING_KEY_ITEMS = List.of(
+            CryptographicKeyItemModelFixtures.activeSigningPrivateKey(KeyAlgorithm.RSA),
+            CryptographicKeyItemModelFixtures.publicKey(KeyAlgorithm.RSA));
+
     // ── validate() ───────────────────────────────────────────────────────────
 
     @Test
     void validate_returnsNok_whenCertificateIsNotAcceptableForNonQualifiedTimestamping() {
         // given — a revoked certificate is not acceptable for signing
-        var certificate = CertificateBuilder.aCertificate().state(CertificateState.REVOKED).build();
-        var scheme = new ResolvedStaticKeyManagedSigning(certificate, List.of(), List.of());
+        var certificate = SigningCertificateBuilder.aSigningCertificate().state(CertificateState.REVOKED).build();
+        var scheme = new ResolvedStaticKeyManagedSigning(certificate, SIGNING_KEY_ITEMS, List.of(), List.of());
 
         // when
         var result = provider.validate(scheme, false);
@@ -38,7 +45,7 @@ class StaticManagedKeyCertificateProviderTest {
     @Test
     void validate_returnsOk_whenCertificateIsAcceptableForNonQualifiedTimestamping() {
         // given
-        var scheme = new ResolvedStaticKeyManagedSigning(CertificateBuilder.valid(), List.of(), List.of());
+        var scheme = new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), SIGNING_KEY_ITEMS, List.of(), List.of());
 
         // when
         var result = provider.validate(scheme, false);
@@ -50,7 +57,7 @@ class StaticManagedKeyCertificateProviderTest {
     @Test
     void validate_returnsNok_whenCertificateHasNoQcComplianceForQualifiedTimestamping() {
         // given — qcCompliance is absent, which is required for qualified timestamps (ETSI EN 319 421)
-        var scheme = new ResolvedStaticKeyManagedSigning(CertificateBuilder.valid(), List.of(), List.of());
+        var scheme = new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), SIGNING_KEY_ITEMS, List.of(), List.of());
 
         // when
         var result = provider.validate(scheme, true);
@@ -63,8 +70,8 @@ class StaticManagedKeyCertificateProviderTest {
     @Test
     void validate_returnsOk_whenCertificateIsAcceptableForQualifiedTimestamping() {
         // given
-        var certificate = CertificateBuilder.aCertificate().qcCompliance(true).build();
-        var scheme = new ResolvedStaticKeyManagedSigning(certificate, List.of(), List.of());
+        var certificate = SigningCertificateBuilder.aSigningCertificate().qcCompliance(true).build();
+        var scheme = new ResolvedStaticKeyManagedSigning(certificate, SIGNING_KEY_ITEMS, List.of(), List.of());
 
         // when
         var result = provider.validate(scheme, true);
@@ -78,8 +85,7 @@ class StaticManagedKeyCertificateProviderTest {
     @Test
     void getCertificateChain_throwsTspException_whenChainIsEmpty() {
         // given — the resolved scheme carries no certificate chain
-        var certificate = CertificateBuilder.aCertificate().withoutKey().build();
-        var scheme = new ResolvedStaticKeyManagedSigning(certificate, List.of(), List.of());
+        var scheme = new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), List.of(), List.of(), List.of());
 
         // when / then
         var exception = assertThrows(TspException.class, () -> provider.getCertificateChain(scheme));
@@ -90,8 +96,7 @@ class StaticManagedKeyCertificateProviderTest {
     void getCertificateChain_returnsCertificateChain_whenChainIsPresent() throws Exception {
         // given
         X509Certificate x509 = CertificateTestUtil.createTimestampingCertificate();
-        var certificate = CertificateBuilder.aCertificate().withoutKey().build();
-        var scheme = new ResolvedStaticKeyManagedSigning(certificate, List.of(x509), List.of());
+        var scheme = new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), List.of(), List.of(x509), List.of());
 
         // when
         CertificateChain result = provider.getCertificateChain(scheme);

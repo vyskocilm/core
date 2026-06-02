@@ -5,8 +5,12 @@ import com.czertainly.api.exception.NotFoundException;
 import com.czertainly.api.interfaces.core.tsp.error.TspException;
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
+import com.czertainly.api.model.common.enums.cryptography.KeyAlgorithm;
 import com.czertainly.api.model.core.signing.SigningProtocol;
-import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModel;
+import com.czertainly.core.model.crypto.CryptographicKeyItemModelFixtures;
+import com.czertainly.core.model.signing.SigningCertificate;
+import com.czertainly.core.model.signing.SigningCertificateBuilder;
 import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.model.signing.resolved.ResolvedManagedTimestampingProfile;
 import com.czertainly.core.model.signing.resolved.ResolvedStaticKeyManagedSigning;
@@ -20,6 +24,7 @@ import com.czertainly.core.model.signing.workflow.DelegatedRawSigningWorkflow;
 import com.czertainly.core.model.signing.workflow.ManagedTimestampingWorkflow;
 import com.czertainly.core.model.signing.workflow.SigningWorkflow;
 import com.czertainly.core.service.CertificateService;
+import com.czertainly.core.service.CryptographicKeyService;
 import com.czertainly.core.service.TimeQualityConfigurationService;
 import com.czertainly.core.service.v2.ConnectorService;
 import org.junit.jupiter.api.Test;
@@ -48,6 +53,8 @@ class SigningProfileResolverTest {
 
     @Mock
     private CertificateService certificateService;
+    @Mock
+    private CryptographicKeyService cryptographicKeyService;
     @Mock
     private TimeQualityConfigurationService timeQualityConfigurationService;
     @Mock
@@ -89,10 +96,17 @@ class SigningProfileResolverTest {
                 TQC_UUID, "tqc", Duration.ofSeconds(1), List.of("ntp"), Duration.ofSeconds(10),
                 4, Duration.ofSeconds(5), 1, Duration.ofMillis(500), false);
         ApiClientConnectorInfo connector = mock(ApiClientConnectorInfo.class);
-        Certificate certificate = new Certificate();
+
+        UUID keyItemUuid = UUID.fromString("44444444-4444-4444-4444-444444444444");
+        SigningCertificate certificate = SigningCertificateBuilder.aSigningCertificate()
+                .uuid(CERTIFICATE_UUID)
+                .keyItemUuids(List.of(keyItemUuid))
+                .build();
+        CryptographicKeyItemModel keyItem = CryptographicKeyItemModelFixtures.activeSigningPrivateKey(KeyAlgorithm.RSA);
         List<X509Certificate> chain = List.of(someX509());
 
-        when(certificateService.getCertificateEntity(any())).thenReturn(certificate);
+        when(certificateService.getSigningCertificate(CERTIFICATE_UUID)).thenReturn(certificate);
+        when(cryptographicKeyService.getKeyItemModel(keyItemUuid)).thenReturn(keyItem);
         when(certificateService.getCertificateChainForSigning(eq(CERTIFICATE_UUID), eq(true))).thenReturn(chain);
         when(timeQualityConfigurationService.getTimeQualityConfigurationModel(TQC_UUID)).thenReturn(tqc);
         when(connectorService.getConnectorForApiClient(CONNECTOR_UUID)).thenReturn(connector);
@@ -116,14 +130,20 @@ class SigningProfileResolverTest {
         assertThat(result.resolvedScheme()).isInstanceOf(ResolvedStaticKeyManagedSigning.class);
         ResolvedStaticKeyManagedSigning resolvedScheme = (ResolvedStaticKeyManagedSigning) result.resolvedScheme();
         assertThat(resolvedScheme.certificate()).isSameAs(certificate);
+        assertThat(resolvedScheme.keyItems()).containsExactly(keyItem);
         assertThat(resolvedScheme.chain()).isEqualTo(chain);
+
+        // resolves from caches, not from the JPA entity accessor
+        verify(certificateService).getSigningCertificate(CERTIFICATE_UUID);
+        verify(cryptographicKeyService).getKeyItemModel(keyItemUuid);
+        verify(certificateService, never()).getCertificateEntity(any());
     }
 
     // ── time quality configuration resolution ─────────────────────────────────
 
     @Test
     void resolve_nullTimeQualityConfigurationUuid_fallsBackToLocalClock_andSkipsLookup() throws Exception {
-        when(certificateService.getCertificateEntity(any())).thenReturn(new Certificate());
+        when(certificateService.getSigningCertificate(any())).thenReturn(SigningCertificateBuilder.valid());
         when(certificateService.getCertificateChainForSigning(any(), eq(true))).thenReturn(List.of(someX509()));
         when(connectorService.getConnectorForApiClient(any())).thenReturn(mock(ApiClientConnectorInfo.class));
 
@@ -137,7 +157,7 @@ class SigningProfileResolverTest {
     @Test
     void resolve_explicitTimeQualityConfigurationUuid_isFetchedFromService() throws Exception {
         TimeQualityConfigurationModel tqc = LocalClockTimeQualityConfiguration.INSTANCE; // pass-through sentinel
-        when(certificateService.getCertificateEntity(any())).thenReturn(new Certificate());
+        when(certificateService.getSigningCertificate(any())).thenReturn(SigningCertificateBuilder.valid());
         when(certificateService.getCertificateChainForSigning(any(), eq(true))).thenReturn(List.of(someX509()));
         when(connectorService.getConnectorForApiClient(any())).thenReturn(mock(ApiClientConnectorInfo.class));
         when(timeQualityConfigurationService.getTimeQualityConfigurationModel(TQC_UUID)).thenReturn(tqc);
@@ -174,7 +194,21 @@ class SigningProfileResolverTest {
 
     @Test
     void resolve_certificateNotFound_throwsSystemFailure() throws Exception {
-        when(certificateService.getCertificateEntity(any())).thenThrow(new NotFoundException("certificate not found"));
+        when(certificateService.getSigningCertificate(any())).thenThrow(new NotFoundException("certificate not found"));
+
+        var model = managedTimestampingModel(managedTimestampingWorkflow(TQC_UUID), staticKeyScheme());
+
+        assertThatThrownBy(() -> resolver.resolve(model))
+                .isInstanceOf(TspException.class)
+                .satisfies(ex -> assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.SYSTEM_FAILURE));
+    }
+
+    @Test
+    void resolve_keyItemNotFound_throwsSystemFailure() throws Exception {
+        UUID keyItemUuid = UUID.fromString("55555555-5555-5555-5555-555555555555");
+        when(certificateService.getSigningCertificate(any())).thenReturn(
+                SigningCertificateBuilder.aSigningCertificate().keyItemUuids(List.of(keyItemUuid)).build());
+        when(cryptographicKeyService.getKeyItemModel(keyItemUuid)).thenThrow(new NotFoundException("key item not found"));
 
         var model = managedTimestampingModel(managedTimestampingWorkflow(TQC_UUID), staticKeyScheme());
 
@@ -185,7 +219,7 @@ class SigningProfileResolverTest {
 
     @Test
     void resolve_certificateChainCannotBeParsed_throwsSystemFailure() throws Exception {
-        when(certificateService.getCertificateEntity(any())).thenReturn(new Certificate());
+        when(certificateService.getSigningCertificate(any())).thenReturn(SigningCertificateBuilder.valid());
         when(certificateService.getCertificateChainForSigning(any(), eq(true)))
                 .thenThrow(new CertificateException("bad DER"));
 
@@ -198,7 +232,7 @@ class SigningProfileResolverTest {
 
     @Test
     void resolve_emptyCertificateChain_throwsSystemFailure() throws Exception {
-        when(certificateService.getCertificateEntity(any())).thenReturn(new Certificate());
+        when(certificateService.getSigningCertificate(any())).thenReturn(SigningCertificateBuilder.valid());
         when(certificateService.getCertificateChainForSigning(any(), eq(true))).thenReturn(List.of());
 
         var model = managedTimestampingModel(managedTimestampingWorkflow(TQC_UUID), staticKeyScheme());
@@ -210,7 +244,7 @@ class SigningProfileResolverTest {
 
     @Test
     void resolve_signatureFormatterConnectorNotFound_throwsSystemFailure() throws Exception {
-        when(certificateService.getCertificateEntity(any())).thenReturn(new Certificate());
+        when(certificateService.getSigningCertificate(any())).thenReturn(SigningCertificateBuilder.valid());
         when(certificateService.getCertificateChainForSigning(any(), eq(true))).thenReturn(List.of(someX509()));
         when(timeQualityConfigurationService.getTimeQualityConfigurationModel(TQC_UUID))
                 .thenReturn(LocalClockTimeQualityConfiguration.INSTANCE);

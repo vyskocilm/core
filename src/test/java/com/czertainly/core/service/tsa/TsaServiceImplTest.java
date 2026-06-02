@@ -8,7 +8,7 @@ import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
 import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
 import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
 import com.czertainly.api.model.core.signing.SigningProtocol;
-import com.czertainly.core.dao.entity.Certificate;
+import com.czertainly.core.model.signing.SigningCertificateBuilder;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.dao.entity.signing.SigningProfileVersion;
 import com.czertainly.core.dao.entity.signing.TspProfile;
@@ -77,7 +77,7 @@ class TsaServiceImplTest extends BaseSpringBootTest {
                     List.of(SigningProtocol.TSP), Boolean.FALSE, "1.2.3.4.5",
                     List.of(), List.of(), false, List.of(),
                     LocalClockTimeQualityConfiguration.INSTANCE, null,
-                    new ResolvedStaticKeyManagedSigning(new Certificate(), List.of(), List.of()));
+                    new ResolvedStaticKeyManagedSigning(SigningCertificateBuilder.valid(), List.of(), List.of(), List.of()));
         });
     }
 
