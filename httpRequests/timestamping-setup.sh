@@ -60,7 +60,7 @@ POLICY_ID_QUALIFIED="1.2.3.4.5.7"
 
 # Time Quality configuration (used by the qualified signing profile)
 TIME_QUALITY_CONFIG_NAME="time-quality"
-TIME_QUALITY_NTP_SERVERS="localhost"       # comma-separated list, e.g. "pool.ntp.org,time.cloudflare.com"
+TIME_QUALITY_NTP_SERVERS="ntp"       # comma-separated list, e.g. "pool.ntp.org,time.cloudflare.com"
 TIME_QUALITY_ACCURACY="PT1S"
 TIME_QUALITY_NTP_CHECK_INTERVAL="PT0.5S"
 TIME_QUALITY_NTP_CHECK_TIMEOUT="PT0.3S"
@@ -1003,7 +1003,8 @@ setup_tsp_profile() {
 
   log "Creating TSP profile '${tsp_name}'..."
   _resp=$(ilm_curl POST /v1/tspProfiles -d \
-    "$(jq -n --arg name "$tsp_name" '{name: $name, customAttributes: []}')")
+    "$(jq -n --arg name "$tsp_name" \
+      '{name: $name, allowedAuthenticationMethods: ["clientCertificate"], customAttributes: []}')")
   _tsp_uuid=$(require_uuid "$_resp" "TSP profile '${tsp_name}'")
   ok "TSP profile  $_tsp_uuid"
 
@@ -1117,7 +1118,7 @@ link_tsp_signing_profile() {
     "$(jq -n \
       --arg name   "$tsp_name" \
       --arg spUuid "$sp_uuid" \
-      '{name: $name, defaultSigningProfileUuid: $spUuid, customAttributes: []}')" \
+      '{name: $name, defaultSigningProfileUuid: $spUuid, allowedAuthenticationMethods: ["clientCertificate"], customAttributes: []}')" \
     >/dev/null
   ok "TSP profile default Signing Profile set"
 
