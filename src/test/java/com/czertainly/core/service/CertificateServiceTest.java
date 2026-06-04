@@ -137,6 +137,8 @@ class CertificateServiceTest extends BaseSpringBootTest {
     @Autowired
     private TokenProfileRepository tokenProfileRepository;
     @Autowired
+    private TokenInstanceReferenceRepository tokenInstanceReferenceRepository;
+    @Autowired
     private AttributeService attributeService;
     @Autowired
     private AcmeProfileRepository acmeProfileRepository;
@@ -1524,7 +1526,7 @@ class CertificateServiceTest extends BaseSpringBootTest {
             List<CertificateTestData.KeyItemData> publicKeys,
             List<CertificateTestData.KeyItemData> privateKeys,
             CertificateState certificateState, CertificateValidationStatus validationStatus, boolean archived,
-            boolean withTokenProfile, List<String> extendedKeyUsages, boolean extendedKeyUsageCritical,
+            boolean withTokenProfile, boolean withTokenInstanceReference, List<String> extendedKeyUsages, boolean extendedKeyUsageCritical,
             SigningWorkflowType workflowType, boolean qualifiedTimestamp, Boolean qcCompliance,
             boolean shouldBeAccepted
     ) {
@@ -1543,6 +1545,14 @@ class CertificateServiceTest extends BaseSpringBootTest {
                 tokenProfile.setEnabled(true);
                 tokenProfile = tokenProfileRepository.save(tokenProfile);
                 key.setTokenProfile(tokenProfile);
+                cryptographicKeyRepository.save(key);
+            }
+            if (withTokenInstanceReference) {
+                TokenInstanceReference tokenInstanceReference = new TokenInstanceReference();
+                tokenInstanceReference.setName(testCaseName + " Token Instance");
+                tokenInstanceReference.setTokenInstanceUuid(UUID.randomUUID().toString());
+                tokenInstanceReference = tokenInstanceReferenceRepository.save(tokenInstanceReference);
+                key.setTokenInstanceReference(tokenInstanceReference);
                 cryptographicKeyRepository.save(key);
             }
         }
