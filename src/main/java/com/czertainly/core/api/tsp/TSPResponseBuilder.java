@@ -1,7 +1,7 @@
 package com.czertainly.core.api.tsp;
 
 import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.core.service.tsa.messages.TspResponse;
+import com.czertainly.core.signing.tsa.messages.TspResponse;
 import org.bouncycastle.asn1.cmp.PKIFailureInfo;
 import org.bouncycastle.asn1.cmp.PKIFreeText;
 import org.bouncycastle.asn1.cmp.PKIStatus;
