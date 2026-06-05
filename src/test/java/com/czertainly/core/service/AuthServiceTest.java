@@ -79,15 +79,36 @@ class AuthServiceTest extends BaseSpringBootTest {
         injectLocalhostUserProfileToContext();
 
         UserProfileDetailDto userProfileDto = authService.getAuthProfile();
-        var expected = List.of(Resource.CERTIFICATE, Resource.CRYPTOGRAPHIC_KEY, Resource.SECRET, Resource.SETTINGS, Resource.SIGNING_RECORD);
-        Assertions.assertIterableEquals(expected, userProfileDto.getPermissions().getAllowedListings());
+        List<Resource> allowedListings = userProfileDto.getPermissions().getAllowedListings();
+        // 5 permission-derived listings (incl. SIGNING_RECORD) + DASHBOARD and APPROVAL added by default
+        Assertions.assertEquals(7, allowedListings.size());
+        Assertions.assertTrue(allowedListings.contains(Resource.SIGNING_RECORD), "SIGNING_RECORD must be in allowed listings");
+        Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
+        Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");
 
         // allow also users through group object member permissions
         injectLocalhostUserProfileChangedToContext();
-        userProfileDto = authService.getAuthProfile();
-        expected = List.of(Resource.CERTIFICATE, Resource.GROUP, Resource.CRYPTOGRAPHIC_KEY, Resource.SECRET, Resource.SETTINGS, Resource.SIGNING_RECORD, Resource.USER);
-        Assertions.assertIterableEquals(expected, userProfileDto.getPermissions().getAllowedListings());
+        allowedListings = authService.getAuthProfile().getPermissions().getAllowedListings();
+        // 7 permission-derived listings (incl. SIGNING_RECORD) + DASHBOARD and APPROVAL added by default
+        Assertions.assertEquals(9, allowedListings.size());
+        Assertions.assertTrue(allowedListings.contains(Resource.SIGNING_RECORD), "SIGNING_RECORD must be in allowed listings");
+        Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
+        Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");
+    }
 
+    @Test
+    void testAuthProfileAllowAllResourcesDefaultListings() {
+        injectAllowAllResourcesUserProfileToContext();
+
+        List<Resource> allowedListings = authService.getAuthProfile().getPermissions().getAllowedListings();
+
+        Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
+        Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");
+        // APPROVAL already has a list action in the synced resources — it must not be duplicated
+        Assertions.assertEquals(1, allowedListings.stream().filter(r -> r == Resource.APPROVAL).count(),
+                "APPROVAL must appear exactly once");
+        Assertions.assertEquals(1, allowedListings.stream().filter(r -> r == Resource.DASHBOARD).count(),
+                "DASHBOARD must appear exactly once");
     }
 
     @Test
@@ -214,6 +235,35 @@ class AuthServiceTest extends BaseSpringBootTest {
                 """;
 
         // inject other user profile
+        AuthenticationInfo info = new AuthenticationInfo(AuthMethod.USER_PROXY, "616be97b-0bd0-434c-a582-2d4dee5d0b41", "localhost", List.of(), userProfileData);
+        SecurityContextHolder.getContext().setAuthentication(new CzertainlyAuthenticationToken(new CzertainlyUserDetails(info)));
+    }
+
+    private void injectAllowAllResourcesUserProfileToContext() {
+        String userProfileData = """
+                {
+                    "user": {
+                        "uuid": "616be97b-0bd0-434c-a582-2d4dee5d0b41",
+                        "username": "localhost",
+                        "description": "System user for localhost operations",
+                        "groups": [],
+                        "enabled": true,
+                        "systemUser": true,
+                        "createdAt": "2024-12-02T10:52:54.36424+00:00",
+                        "updatedAt": "2024-12-02T10:52:54.364241+00:00"
+                    },
+                    "roles": [{
+                            "uuid": "9db01d1f-fb62-4be8-b344-a852e82edf80",
+                            "name": "localhost"
+                        }
+                    ],
+                    "permissions": {
+                        "allowAllResources": true,
+                        "resources": []
+                    }
+                }
+                """;
+
         AuthenticationInfo info = new AuthenticationInfo(AuthMethod.USER_PROXY, "616be97b-0bd0-434c-a582-2d4dee5d0b41", "localhost", List.of(), userProfileData);
         SecurityContextHolder.getContext().setAuthentication(new CzertainlyAuthenticationToken(new CzertainlyUserDetails(info)));
     }
