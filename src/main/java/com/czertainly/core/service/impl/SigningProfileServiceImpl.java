@@ -13,7 +13,13 @@ import com.czertainly.api.model.client.attribute.ResponseAttribute;
 import com.czertainly.api.model.client.certificate.SearchFilterRequestDto;
 import com.czertainly.api.model.client.certificate.SearchRequestDto;
 import com.czertainly.api.model.client.signing.profile.SimplifiedSigningProfileDto;
-import com.czertainly.api.model.client.signing.profile.workflow.*;
+import com.czertainly.api.model.client.signing.profile.record.SigningRecordPersistenceMode;
+import com.czertainly.api.model.client.signing.profile.record.SigningRecordPolicyRequestDto;
+import com.czertainly.api.model.client.signing.profile.workflow.ContentSigningWorkflowRequestDto;
+import com.czertainly.api.model.client.signing.profile.workflow.RawSigningWorkflowRequestDto;
+import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
+import com.czertainly.api.model.client.signing.profile.workflow.TimestampingWorkflowRequestDto;
+import com.czertainly.api.model.client.signing.profile.workflow.WorkflowRequestDto;
 import com.czertainly.api.model.common.NameAndUuidDto;
 import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
 import com.czertainly.api.model.client.signing.profile.SigningProfileListDto;
@@ -37,10 +43,12 @@ import com.czertainly.api.model.core.scheduler.PaginationRequestDto;
 import com.czertainly.api.model.core.search.FilterFieldSource;
 import com.czertainly.api.model.core.search.SearchFieldDataByGroupDto;
 import com.czertainly.api.model.core.search.SearchFieldDataDto;
+import com.czertainly.core.cluster.ClusterOperationSynchronizer;
 import com.czertainly.core.comparator.SearchFieldDataComparator;
 import com.czertainly.core.config.cache.CacheConfig;
 import com.czertainly.core.config.cache.CacheEvictor;
 import com.czertainly.core.enums.FilterField;
+import com.czertainly.core.service.*;
 import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.util.SearchHelper;
 import com.czertainly.api.model.core.signing.SigningProtocol;
@@ -71,14 +79,6 @@ import com.czertainly.core.model.auth.ResourceAction;
 import com.czertainly.core.security.authz.ExternalAuthorization;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
-import com.czertainly.core.service.CertificateService;
-import com.czertainly.core.service.ConnectorService;
-import com.czertainly.core.service.CryptographicOperationService;
-import com.czertainly.core.service.RaProfileService;
-import com.czertainly.core.service.SigningProfileService;
-import com.czertainly.core.service.SigningRecordService;
-import com.czertainly.core.service.TokenProfileService;
-import com.czertainly.core.service.TspProfileService;
 import com.czertainly.core.service.model.SecuredList;
 import com.czertainly.core.util.CertificateEligibilityUtil;
 import com.czertainly.core.util.FilterPredicatesBuilder;
@@ -117,8 +117,9 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     private ConnectorService connectorService;
     private TokenProfileService tokenProfileService;
     private RaProfileService raProfileService;
-    private CryptographicKeyItemRepository cryptographicKeyItemRepository;
     private SigningRecordService signingRecordService;
+
+    private CryptographicKeyItemRepository cryptographicKeyItemRepository;
     private SigningProfileRepository signingProfileRepository;
     private SigningProfileVersionRepository signingProfileVersionRepository;
     private SigningProfileWriter signingProfileWriter;
@@ -127,6 +128,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     private AttributeEngine attributeEngine;
     private ConnectorApiFactory connectorApiFactory;
     private CacheEvictor cacheEvictor;
+    private ClusterOperationSynchronizer clusterSynchronizer;
 
     // ──────────────────────────────────────────────────────────────────────────
     // List / search
@@ -334,6 +336,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         v1.setVersion(1);
         applyWorkflow(profile, v1, request.getWorkflow());
         applyScheme(profile, v1, request.getSigningScheme());
+        applyRecordPolicyToVersion(v1, request.getRecordPolicy());
         profile = signingProfileRepository.save(profile);
         v1.setSigningProfile(profile);
         signingProfileVersionRepository.save(v1);
@@ -362,8 +365,8 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     @Transactional
     SigningProfileDto persistUpdate(SecuredUUID uuid, SigningProfileRequestDto request, List<BaseAttribute> formatterDefinitions)
             throws AlreadyExistException, AttributeException, NotFoundException {
-        // Acquire advisory lock before the bump decision to prevent race conditions
-        signingProfileVersionRepository.acquireAdvisoryLock("signing-profile:" + uuid.getValue());
+        // Serialize the bump decision per profile to prevent concurrent updates from racing.
+        clusterSynchronizer.lock("signing-profile:" + uuid.getValue());
 
         SigningProfile profile = findByUuid(uuid);
         // Capture the previous name under the advisory lock so concurrent renames evict the committed source name.
@@ -377,30 +380,27 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         profile.setName(request.getName());
         profile.setDescription(request.getDescription());
 
-        // Lenient version bump: only create a new version if signing records already reference the current one.
-        boolean bump = signingRecordService.doesSigningRecordExistForVersion(
-                SecuredUUID.fromUUID(profile.getUuid()), profile.getLatestVersion());
+        // Lenient version bump: bump if signing records exist for the current version, or if record policy fields changed.
+        int latestVersion = profile.getLatestVersion();
+        SigningProfileVersion currentVersion = signingProfileVersionRepository.findBySigningProfileUuidAndVersion(profile.getUuid(), latestVersion)
+                .orElseThrow(() -> new NotFoundException("Signing Profile version " + latestVersion + " not found"));
+        boolean recordsExist = signingRecordService.doesSigningRecordExistInternal(profile.getUuid(), latestVersion);
+        boolean policyRecordDifferent = recordPolicyDiffersFromVersion(currentVersion, request.getRecordPolicy());
+        boolean bump = recordsExist || policyRecordDifferent;
 
         SigningProfileVersion version;
         if (bump) {
             profile.setLatestVersion(profile.getLatestVersion() + 1);
             version = new SigningProfileVersion();
-            version.setSigningProfile(profile);
-            version.setVersion(profile.getLatestVersion());
         } else {
-            final SigningProfile profileRef = profile;
-            version = signingProfileVersionRepository
-                    .findBySigningProfileUuidAndVersion(profile.getUuid(), profile.getLatestVersion())
-                    .orElseGet(() -> {
-                        SigningProfileVersion v = new SigningProfileVersion();
-                        v.setSigningProfile(profileRef);
-                        v.setVersion(profileRef.getLatestVersion());
-                        return v;
-                    });
+            version = currentVersion;
         }
+        version.setSigningProfile(profile);
+        version.setVersion(profile.getLatestVersion());
 
         applyWorkflow(profile, version, request.getWorkflow());
         applyScheme(profile, version, request.getSigningScheme());
+        applyRecordPolicyToVersion(version, request.getRecordPolicy());
         profile = signingProfileRepository.save(profile);
         signingProfileVersionRepository.save(version);
 
@@ -448,18 +448,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     }
 
     private void deleteSigningProfile(SigningProfile signingProfile) throws ValidationException {
-        SecuredList<SigningRecord> signingRecords = signingRecordService.listSigningRecordsAssociatedWithSigningProfile(
-                SecuredUUID.fromUUID(signingProfile.getUuid()), SecurityFilter.create());
-        if (!signingRecords.isEmpty()) {
-            throw new ValidationException(
-                    ValidationError.create(String.format(
-                            "Cannot delete Signing Profile: has associated signing records (%d): %s",
-                            signingRecords.size(),
-                            signingRecords.getAllowed().stream().map(SigningRecord::getName).collect(Collectors.joining(", "))
-                    ))
-            );
-        }
-
         SecuredList<TspProfile> tspProfiles = tspProfileService.listTspProfilesUsingSigningProfileAsDefault(
                 SecuredUUID.fromUUID(signingProfile.getUuid()), SecurityFilter.create());
         if (!tspProfiles.isEmpty()) {
@@ -468,6 +456,15 @@ public class SigningProfileServiceImpl implements SigningProfileService {
                             "Cannot delete Signing Profile: used as default signing profile by TSP Profiles (%d): %s",
                             tspProfiles.size(),
                             tspProfiles.getAllowed().stream().map(TspProfile::getName).collect(Collectors.joining(", "))
+                    ))
+            );
+        }
+
+        if (signingRecordService.doesSigningRecordExistForProfileInternal(signingProfile.getUuid())) {
+            throw new ValidationException(
+                    ValidationError.create(String.format(
+                            "Cannot delete Signing Profile '%s': it has signing records. Delete the signing records first.",
+                            signingProfile.getName()
                     ))
             );
         }
@@ -553,19 +550,6 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         signingProfileRepository.save(p);
         tspProfileService.evictAllCachedModels();
         evictSigningProfileCache(p.getName());
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Signing records scoped to profile (stub list)
-    // ──────────────────────────────────────────────────────────────────────────
-
-    @Override
-    @ExternalAuthorization(resource = Resource.SIGNING_PROFILE, action = ResourceAction.DETAIL)
-    @Transactional
-    public PaginationResponseDto<SigningRecordListDto> listSigningRecordsForSigningProfile(
-            SecuredUUID uuid, SearchRequestDto request, SecurityFilter filter) throws NotFoundException {
-        // :TODO:
-        return null;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -729,6 +713,36 @@ public class SigningProfileServiceImpl implements SigningProfileService {
             }
             default -> throw new IllegalStateException("Unexpected type for Signing Workflow: " + workflow);
         }
+    }
+
+    private boolean recordPolicyDiffersFromVersion(SigningProfileVersion v, SigningRecordPolicyRequestDto p) {
+        if (p == null)
+            return false;
+        return v.isRecordingEnabled() != p.isRecordingEnabled()
+                || v.isRecordRequestMetadata() != p.isRecordRequestMetadata()
+                || v.isRecordSignature() != p.isRecordSignature()
+                || v.isRecordSignedDocument() != p.isRecordSignedDocument()
+                || v.isRecordDtbs() != p.isRecordDtbs()
+                || !Objects.equals(v.getRetentionDays(), p.getRetentionDays())
+                || v.isDeleteAfterRetrieval() != p.isDeleteAfterRetrieval()
+                || resolvePersistenceMode(p) != v.getPersistenceMode();
+    }
+
+    private void applyRecordPolicyToVersion(SigningProfileVersion v, SigningRecordPolicyRequestDto p) {
+        if (p == null)
+            return;
+        v.setRecordingEnabled(p.isRecordingEnabled());
+        v.setRecordRequestMetadata(p.isRecordRequestMetadata());
+        v.setRecordSignature(p.isRecordSignature());
+        v.setRecordSignedDocument(p.isRecordSignedDocument());
+        v.setRecordDtbs(p.isRecordDtbs());
+        v.setRetentionDays(p.getRetentionDays());
+        v.setDeleteAfterRetrieval(p.isDeleteAfterRetrieval());
+        v.setPersistenceMode(resolvePersistenceMode(p));
+    }
+
+    private SigningRecordPersistenceMode resolvePersistenceMode(SigningRecordPolicyRequestDto p) {
+        return p.getPersistenceMode() != null ? p.getPersistenceMode() : SigningRecordPersistenceMode.DEFERRED_DURABLE;
     }
 
     private void validateFormatterConnectorFeature(Connector connector, FeatureFlag requiredFeature, SigningWorkflowType workflowType) {
@@ -949,6 +963,11 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     }
 
     @Autowired
+    public void setSigningRecordService(SigningRecordService signingRecordService) {
+        this.signingRecordService = signingRecordService;
+    }
+
+    @Autowired
     @Lazy
     public void setTspProfileService(TspProfileService tspProfileService) {
         this.tspProfileService = tspProfileService;
@@ -960,7 +979,7 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     }
 
     @Autowired
-    public void setSigningRecordService(SigningRecordService signingRecordService) {
-        this.signingRecordService = signingRecordService;
+    public void setClusterSynchronizer(ClusterOperationSynchronizer clusterSynchronizer) {
+        this.clusterSynchronizer = clusterSynchronizer;
     }
 }

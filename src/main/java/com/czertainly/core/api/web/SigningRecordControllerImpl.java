@@ -3,6 +3,7 @@ package com.czertainly.core.api.web;
 import com.czertainly.api.exception.NotFoundException;
 import com.czertainly.api.interfaces.core.web.SigningRecordController;
 import com.czertainly.api.model.client.certificate.SearchRequestDto;
+import com.czertainly.api.model.common.BulkActionMessageDto;
 import com.czertainly.api.model.common.PaginationResponseDto;
 import com.czertainly.api.model.core.search.SearchFieldDataByGroupDto;
 import com.czertainly.api.model.core.auth.Resource;
@@ -10,7 +11,6 @@ import com.czertainly.api.model.core.logging.enums.Module;
 import com.czertainly.api.model.core.logging.enums.Operation;
 import com.czertainly.api.model.core.signing.signingrecord.SigningRecordDto;
 import com.czertainly.api.model.core.signing.signingrecord.SigningRecordListDto;
-import com.czertainly.api.model.core.signing.signingrecord.SigningRecordValidationResultDto;
 import com.czertainly.core.aop.AuditLogged;
 import com.czertainly.core.auth.AuthEndpoint;
 import com.czertainly.core.logging.LogResource;
@@ -53,8 +53,14 @@ public class SigningRecordControllerImpl implements SigningRecordController {
     }
 
     @Override
-    @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_RECORD, operation = Operation.DETAIL)
-    public SigningRecordValidationResultDto validateSigningRecord(@LogResource(uuid = true) UUID uuid) throws NotFoundException {
-        return signingRecordService.validateSigningRecord(SecuredUUID.fromUUID(uuid));
+    @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_RECORD, operation = Operation.DELETE)
+    public void deleteSigningRecord(@LogResource(uuid = true) UUID uuid) throws NotFoundException {
+        signingRecordService.deleteSigningRecord(SecuredUUID.fromUUID(uuid));
+    }
+
+    @Override
+    @AuditLogged(module = Module.SIGNING, resource = Resource.SIGNING_RECORD, operation = Operation.DELETE)
+    public List<BulkActionMessageDto> bulkDeleteSigningRecords(@LogResource(uuid = true) List<UUID> uuids) {
+        return signingRecordService.bulkDeleteSigningRecords(SecuredUUID.fromUuidList(uuids));
     }
 }
