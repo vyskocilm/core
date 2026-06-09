@@ -15,6 +15,7 @@ import java.util.UUID;
 public class SigningRecordEntityBuilder {
 
     private SigningProfileDto signingProfile = null;
+    private UUID signingProfileUuid = null;
     private int version = 1;
     private String name = null;
     private Instant signingTime = Instant.now().truncatedTo(ChronoUnit.MILLIS);
@@ -32,6 +33,11 @@ public class SigningRecordEntityBuilder {
 
     public SigningRecordEntityBuilder withSigningProfile(SigningProfileDto profile) {
         this.signingProfile = profile;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withSigningProfileUuid(UUID signingProfileUuid) {
+        this.signingProfileUuid = signingProfileUuid;
         return this;
     }
 
@@ -88,8 +94,11 @@ public class SigningRecordEntityBuilder {
     public SigningRecord build() {
         SigningRecord record = new SigningRecord();
         record.setUuid(UUID.randomUUID());
-        if (signingProfile != null) {
-            record.setSigningProfileUuid(UUID.fromString(signingProfile.getUuid()));
+        UUID profileUuid = signingProfileUuid != null
+                ? signingProfileUuid
+                : (signingProfile != null ? UUID.fromString(signingProfile.getUuid()) : null);
+        if (profileUuid != null) {
+            record.setSigningProfileUuid(profileUuid);
         }
         record.setName(name != null ? name : (signingProfile != null ? signingProfile.getName() : null));
         record.setSigningProfileVersion(version);

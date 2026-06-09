@@ -88,7 +88,7 @@ import com.czertainly.core.dao.repository.RaProfileRepository;
 import com.czertainly.core.dao.repository.TokenProfileRepository;
 import com.czertainly.core.dao.repository.signing.SigningProfileRepository;
 import com.czertainly.core.dao.repository.signing.SigningProfileVersionRepository;
-import com.czertainly.core.dao.repository.signing.SigningRecordRepository;
+import com.czertainly.core.service.writer.signingrecord.SigningRecordWriter;
 import com.czertainly.core.dao.repository.signing.TspProfileRepository;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
@@ -100,13 +100,18 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.czertainly.core.model.auth.ResourceAction;
 import com.czertainly.core.security.authz.opa.dto.OpaResourceAccessResult;
 import org.bouncycastle.operator.OperatorCreationException;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+import static com.czertainly.core.util.builders.SigningRecordEntityBuilder.aSigningRecord;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -131,10 +136,9 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -181,7 +185,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     private SigningProfileVersionRepository signingProfileVersionRepository;
 
     @Autowired
-    private SigningRecordRepository signingRecordRepository;
+    private SigningRecordWriter signingRecordWriter;
 
     @Autowired
     private TspProfileRepository tspRepository;
@@ -219,23 +223,24 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     private SigningProfile savedProfile;
 
     /**
-     * A minimal RaProfile used as FK reference in ONE_TIME_KEY managed signing scheme requests.
-     */
-    private RaProfile raProfile;
-
-    /**
      * Persists a signing record referencing {@code (profileUuid, version)}. Updates bump the profile version
      * leniently — only when a signing record already references the current version — so version-snapshot
      * tests seed a record before each update that must produce a new version.
      */
     private void seedSigningRecordForVersion(UUID profileUuid, int version) {
-        SigningRecord record = new SigningRecord();
-        record.setName("seed-" + profileUuid + "-v" + version);
-        record.setSigningProfileUuid(profileUuid);
-        record.setSigningProfileVersion(version);
-        record.setSigningTime(Instant.now());
-        signingRecordRepository.saveAndFlush(record);
+        SigningRecord record = aSigningRecord()
+                .withName("seed-" + profileUuid + "-v" + version)
+                .withSigningProfileUuid(profileUuid)
+                .withVersion(version)
+                .withSigningTime(Instant.now())
+                .build();
+        signingRecordWriter.insert(record);
     }
+
+    /**
+     * A minimal RaProfile used as FK reference in ONE_TIME_KEY managed signing scheme requests.
+     */
+    private RaProfile raProfile;
 
     /**
      * A token profile used as an FK reference in static-key managed signing scheme requests.
@@ -359,18 +364,18 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         mldsaKeyItem.setKeyReferenceUuid(mldsaKeyItem.getUuid());
         cryptographicKeyItemRepository.saveAndFlush(mldsaKeyItem);
 
-        CryptographicKeyItem mldsaPubKeyItem = new CryptographicKeyItem();
-        mldsaPubKeyItem.setKey(cryptographicKey);
-        mldsaPubKeyItem.setKeyUuid(cryptographicKey.getUuid());
-        mldsaPubKeyItem.setType(KeyType.PUBLIC_KEY);
-        mldsaPubKeyItem.setState(KeyState.ACTIVE);
-        mldsaPubKeyItem.setEnabled(true);
-        mldsaPubKeyItem.setKeyAlgorithm(KeyAlgorithm.MLDSA);
-        mldsaPubKeyItem.setLength(2048);
-        mldsaPubKeyItem.setUsage(List.of(KeyUsage.VERIFY));
-        mldsaPubKeyItem = cryptographicKeyItemRepository.saveAndFlush(mldsaPubKeyItem);
-        mldsaPubKeyItem.setKeyReferenceUuid(mldsaPubKeyItem.getUuid());
-        cryptographicKeyItemRepository.saveAndFlush(mldsaPubKeyItem);
+        CryptographicKeyItem mldsaPublicKeyItem = new CryptographicKeyItem();
+        mldsaPublicKeyItem.setKey(cryptographicKey);
+        mldsaPublicKeyItem.setKeyUuid(cryptographicKey.getUuid());
+        mldsaPublicKeyItem.setType(KeyType.PUBLIC_KEY);
+        mldsaPublicKeyItem.setState(KeyState.ACTIVE);
+        mldsaPublicKeyItem.setEnabled(true);
+        mldsaPublicKeyItem.setKeyAlgorithm(KeyAlgorithm.MLDSA);
+        mldsaPublicKeyItem.setLength(2048);
+        mldsaPublicKeyItem.setUsage(List.of(KeyUsage.VERIFY));
+        mldsaPublicKeyItem = cryptographicKeyItemRepository.saveAndFlush(mldsaPublicKeyItem);
+        mldsaPublicKeyItem.setKeyReferenceUuid(mldsaPublicKeyItem.getUuid());
+        cryptographicKeyItemRepository.saveAndFlush(mldsaPublicKeyItem);
 
         // Certificate associated with the MLDSA key; satisfies constructQueryDigitalSigningCertAcceptable conditions
         certificate = new Certificate();
@@ -400,18 +405,18 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         rsaKeyItem.setKeyReferenceUuid(rsaKeyItem.getUuid());
         cryptographicKeyItemRepository.saveAndFlush(rsaKeyItem);
 
-        CryptographicKeyItem rsaPubKeyItem = new CryptographicKeyItem();
-        rsaPubKeyItem.setKey(rsaCryptographicKey);
-        rsaPubKeyItem.setKeyUuid(rsaCryptographicKey.getUuid());
-        rsaPubKeyItem.setType(KeyType.PUBLIC_KEY);
-        rsaPubKeyItem.setState(KeyState.ACTIVE);
-        rsaPubKeyItem.setEnabled(true);
-        rsaPubKeyItem.setKeyAlgorithm(KeyAlgorithm.RSA);
-        rsaPubKeyItem.setLength(2048);
-        rsaPubKeyItem.setUsage(List.of(KeyUsage.VERIFY));
-        rsaPubKeyItem = cryptographicKeyItemRepository.saveAndFlush(rsaPubKeyItem);
-        rsaPubKeyItem.setKeyReferenceUuid(rsaPubKeyItem.getUuid());
-        cryptographicKeyItemRepository.saveAndFlush(rsaPubKeyItem);
+        CryptographicKeyItem rsaPublicKeyItem = new CryptographicKeyItem();
+        rsaPublicKeyItem.setKey(rsaCryptographicKey);
+        rsaPublicKeyItem.setKeyUuid(rsaCryptographicKey.getUuid());
+        rsaPublicKeyItem.setType(KeyType.PUBLIC_KEY);
+        rsaPublicKeyItem.setState(KeyState.ACTIVE);
+        rsaPublicKeyItem.setEnabled(true);
+        rsaPublicKeyItem.setKeyAlgorithm(KeyAlgorithm.RSA);
+        rsaPublicKeyItem.setLength(2048);
+        rsaPublicKeyItem.setUsage(List.of(KeyUsage.VERIFY));
+        rsaPublicKeyItem = cryptographicKeyItemRepository.saveAndFlush(rsaPublicKeyItem);
+        rsaPublicKeyItem.setKeyReferenceUuid(rsaPublicKeyItem.getUuid());
+        cryptographicKeyItemRepository.saveAndFlush(rsaPublicKeyItem);
 
         // Certificate associated with the RSA key; satisfies constructQueryDigitalSigningCertAcceptable conditions
         rsaCertificate = new Certificate();
@@ -917,7 +922,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                     () -> signingProfileService.getSigningProfile(profileUuid, 99));
         }
 
-        @Disabled
         @Test
         void afterVersionBump_oldVersionPreservesOriginalWorkflowType()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
@@ -1290,7 +1294,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     @Nested
     class UpdateTests {
 
-        @Disabled
         @Test
         void assertDtoAndDbEntity() throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
             // given
@@ -1321,7 +1324,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             assertEquals(SigningWorkflowType.RAW_SIGNING, entity.getWorkflowType());
         }
 
-        @Disabled
         @Test
         void versionBump_oldVersionAttributesPreservedInEngine()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
@@ -1372,7 +1374,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                     "Version 2 signing-op attributes should be stored after bump");
         }
 
-        @Disabled
         @Test
         void versionBump_oldFormatterAttributesPreservedInEngine()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
@@ -1527,7 +1528,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             assertFalse(currentVersion.getValidateTokenSignature());
         }
 
-        @Disabled
         @Test
         void multipleBumps_versionsAccumulate()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
@@ -2165,7 +2165,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
                     "Signing-scheme attributes should be removed by deleteObjectAttributeContent on profile deletion");
         }
 
-        @Disabled
         @Test
         void getSpecificVersion_returnsVersionedAttributes()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
@@ -2319,7 +2318,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             assertEquals(fa.name(), wfDto.getSignatureFormatterConnectorAttributes().getFirst().getName());
         }
 
-        @Disabled
         @Test
         void update_connectorChanged_oldAttributesCleared()
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
