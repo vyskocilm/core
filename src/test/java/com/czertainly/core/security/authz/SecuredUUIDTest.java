@@ -130,6 +130,6 @@ class SecuredUUIDTest {
         var result = securedUUID.toString();
 
         // then
-        assertNull(result);
+        assertEquals("SecuredUUID[null]", result);
     }
 }

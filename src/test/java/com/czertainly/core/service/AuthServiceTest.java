@@ -80,18 +80,16 @@ class AuthServiceTest extends BaseSpringBootTest {
 
         UserProfileDetailDto userProfileDto = authService.getAuthProfile();
         List<Resource> allowedListings = userProfileDto.getPermissions().getAllowedListings();
-        // 5 permission-derived listings (incl. SIGNING_RECORD) + DASHBOARD and APPROVAL added by default
-        Assertions.assertEquals(7, allowedListings.size());
-        Assertions.assertTrue(allowedListings.contains(Resource.SIGNING_RECORD), "SIGNING_RECORD must be in allowed listings");
+        // 4 permission-derived listings (CERTIFICATE, CRYPTOGRAPHIC_KEY, SECRET as owner-scoped, SETTINGS by list action) + DASHBOARD and APPROVAL added by default
+        Assertions.assertEquals(6, allowedListings.size());
         Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
         Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");
 
         // allow also users through group object member permissions
         injectLocalhostUserProfileChangedToContext();
         allowedListings = authService.getAuthProfile().getPermissions().getAllowedListings();
-        // 7 permission-derived listings (incl. SIGNING_RECORD) + DASHBOARD and APPROVAL added by default
-        Assertions.assertEquals(9, allowedListings.size());
-        Assertions.assertTrue(allowedListings.contains(Resource.SIGNING_RECORD), "SIGNING_RECORD must be in allowed listings");
+        // 6 permission-derived listings (the 4 above + GROUP by its list action + USER via group object member permissions) + DASHBOARD and APPROVAL added by default
+        Assertions.assertEquals(8, allowedListings.size());
         Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
         Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");
     }
@@ -784,19 +782,6 @@ class AuthServiceTest extends BaseSpringBootTest {
                         "uuid": "d1c8e5b4-9c3a-4c8e-9b0c-1f2a5e6f7892",
                         "name": "secrets",
                         "displayName": "Secrets",
-                        "objectAccess": true,
-                        "actions": [
-                            {
-                                "uuid": "b31b0ea1-d97f-4ade-895c-a982f4544e1b",
-                                "name": "list",
-                                "displayName": "List"
-                            }
-                        ]
-                    },
-                    {
-                        "uuid": "d1c8e5b4-9c3a-4c8e-9b0c-1f2a5e6f7893",
-                        "name": "signingRecords",
-                        "displayName": "Signing Record",
                         "objectAccess": true,
                         "actions": [
                             {
