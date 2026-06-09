@@ -4,13 +4,27 @@ import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
 import com.czertainly.core.dao.entity.signing.SigningRecord;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+/**
+ * Builds an in-memory {@link SigningRecord} with valid, unremarkable defaults; tests override only the fields
+ * whose values drive the assertion under test. Persistence goes through {@code SigningRecordWriter}, not this
+ * builder — the builder never touches the database.
+ */
 public class SigningRecordEntityBuilder {
 
     private SigningProfileDto signingProfile = null;
     private int version = 1;
-    private Instant signingTime = Instant.now();
+    private String name = null;
+    private Instant signingTime = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    private byte[] signatureValue = null;
+    private byte[] dtbs = null;
+    private byte[] signedDocument = null;
+    private String requestMetadataJson = null;
+    private UUID requestedByUuid = null;
+    private String requestedByUsername = null;
+    private Instant signedDocumentRetrievedAt = null;
 
     public static SigningRecordEntityBuilder aSigningRecord() {
         return new SigningRecordEntityBuilder();
@@ -26,8 +40,48 @@ public class SigningRecordEntityBuilder {
         return this;
     }
 
+    public SigningRecordEntityBuilder withName(String name) {
+        this.name = name;
+        return this;
+    }
+
     public SigningRecordEntityBuilder withSigningTime(Instant time) {
         this.signingTime = time;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withSignatureValue(byte[] signatureValue) {
+        this.signatureValue = signatureValue;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withDtbs(byte[] dtbs) {
+        this.dtbs = dtbs;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withSignedDocument(byte[] signedDocument) {
+        this.signedDocument = signedDocument;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withRequestMetadataJson(String requestMetadataJson) {
+        this.requestMetadataJson = requestMetadataJson;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withRequestedByUuid(UUID requestedByUuid) {
+        this.requestedByUuid = requestedByUuid;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withRequestedByUsername(String requestedByUsername) {
+        this.requestedByUsername = requestedByUsername;
+        return this;
+    }
+
+    public SigningRecordEntityBuilder withSignedDocumentRetrievedAt(Instant signedDocumentRetrievedAt) {
+        this.signedDocumentRetrievedAt = signedDocumentRetrievedAt;
         return this;
     }
 
@@ -36,10 +90,17 @@ public class SigningRecordEntityBuilder {
         record.setUuid(UUID.randomUUID());
         if (signingProfile != null) {
             record.setSigningProfileUuid(UUID.fromString(signingProfile.getUuid()));
-            record.setName(signingProfile.getName());
         }
+        record.setName(name != null ? name : (signingProfile != null ? signingProfile.getName() : null));
         record.setSigningProfileVersion(version);
         record.setSigningTime(signingTime);
+        record.setSignatureValue(signatureValue);
+        record.setDtbs(dtbs);
+        record.setSignedDocument(signedDocument);
+        record.setRequestMetadataJson(requestMetadataJson);
+        record.setRequestedByUuid(requestedByUuid);
+        record.setRequestedByUsername(requestedByUsername);
+        record.setSignedDocumentRetrievedAt(signedDocumentRetrievedAt);
         return record;
     }
 }
