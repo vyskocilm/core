@@ -590,6 +590,19 @@ public class SigningProfileServiceImpl implements SigningProfileService {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Signing records scoped to profile
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Override
+    @ExternalAuthorization(resource = Resource.SIGNING_PROFILE, action = ResourceAction.DETAIL)
+    @Transactional(readOnly = true)
+    public PaginationResponseDto<SigningRecordListDto> listSigningRecordsForSigningProfile(
+            SecuredUUID uuid, SearchRequestDto request, SecurityFilter filter) throws NotFoundException {
+        SigningProfile profile = findByUuid(uuid);
+        return signingRecordService.listSigningRecordsForProfile(profile.getUuid(), request, filter);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ──────────────────────────────────────────────────────────────────────────
 

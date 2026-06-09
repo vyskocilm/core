@@ -1,18 +1,16 @@
 package com.czertainly.core.util.builders;
 
 import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
-import com.czertainly.api.model.client.signing.profile.SigningProfileListDto;
-import com.czertainly.api.model.core.signing.signingrecord.SigningRecordDto;
+import com.czertainly.core.dao.entity.signing.SigningRecord;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.Instant;
+import java.util.UUID;
 
 public class SigningRecordEntityBuilder {
 
     private SigningProfileDto signingProfile = null;
     private int version = 1;
-    private ZonedDateTime signingTime = ZonedDateTime.now();
+    private Instant signingTime = Instant.now();
 
     public static SigningRecordEntityBuilder aSigningRecord() {
         return new SigningRecordEntityBuilder();
@@ -28,21 +26,20 @@ public class SigningRecordEntityBuilder {
         return this;
     }
 
-    public SigningRecordEntityBuilder withSigningTime(ZonedDateTime time) {
+    public SigningRecordEntityBuilder withSigningTime(Instant time) {
         this.signingTime = time;
         return this;
     }
 
-    public SigningRecordDto build() {
-        SigningRecordDto dto = new SigningRecordDto();
+    public SigningRecord build() {
+        SigningRecord record = new SigningRecord();
+        record.setUuid(UUID.randomUUID());
         if (signingProfile != null) {
-            SigningProfileListDto profileRef = new SigningProfileListDto();
-            profileRef.setUuid(signingProfile.getUuid());
-            profileRef.setName(signingProfile.getName());
-            profileRef.setVersion(version);
-            dto.setSigningProfile(profileRef);
+            record.setSigningProfileUuid(UUID.fromString(signingProfile.getUuid()));
+            record.setName(signingProfile.getName());
         }
-        dto.setSigningTime(signingTime);
-        return dto;
+        record.setSigningProfileVersion(version);
+        record.setSigningTime(signingTime);
+        return record;
     }
 }

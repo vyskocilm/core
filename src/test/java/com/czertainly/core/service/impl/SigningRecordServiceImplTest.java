@@ -8,13 +8,20 @@ import com.czertainly.api.model.client.certificate.SearchRequestDto;
 import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
 import com.czertainly.api.model.common.PaginationResponseDto;
 import com.czertainly.api.model.core.connector.v2.ConnectorDetailDto;
+import com.czertainly.api.model.core.search.FilterFieldSource;
+import com.czertainly.api.model.core.search.SearchFieldDataByGroupDto;
+import com.czertainly.api.model.core.search.SearchFieldDataDto;
 import com.czertainly.api.model.core.signing.signingrecord.SigningRecordDto;
 import com.czertainly.api.model.core.signing.signingrecord.SigningRecordListDto;
+import com.czertainly.api.model.core.auth.Resource;
+import com.czertainly.core.dao.entity.signing.SigningRecord;
+import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.SigningProfileService;
 import com.czertainly.core.service.SigningRecordService;
 import com.czertainly.core.service.v2.ConnectorService;
+import com.czertainly.core.service.writer.signingrecord.SigningRecordWriter;
 import com.czertainly.core.util.BaseSpringBootTest;
 import com.czertainly.core.util.mocks.SignerConnectorMock;
 import org.junit.jupiter.api.AfterEach;
@@ -24,8 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.ZonedDateTime;
-
+import java.util.List;
 import java.util.UUID;
 
 import static com.czertainly.core.util.builders.ConnectorRequestDtoBuilder.aV2ConnectorRequest;
@@ -40,6 +46,9 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
 
     @Autowired
     private SigningProfileService signingProfileService;
+
+    @Autowired
+    private SigningRecordWriter signingRecordWriter;
 
     @Autowired
     private ConnectorService connectorService;
@@ -77,54 +86,22 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
     }
 
     @Nested
-    class SaveTests {
-
-        @Test
-        void persistsRecord_andAssignsUuid() {
-            // when
-            SigningRecordDto saved = signingRecordService.saveSigningRecord(
-                    aSigningRecord()
-                            .withSigningProfile(defaultProfile)
-                            .build());
-
-            // then
-            assertNotNull(saved.getUuid());
-        }
-
-        @Test
-        void persistsSigningTime() {
-            // given
-            ZonedDateTime signingTime = ZonedDateTime.now();
-
-            // when
-            SigningRecordDto saved = signingRecordService.saveSigningRecord(
-                    aSigningRecord()
-                            .withSigningProfile(defaultProfile)
-                            .withSigningTime(signingTime)
-                            .build());
-
-            // then: zone ID is dropped by the DB round-trip; compare the instant
-            assertEquals(signingTime.toInstant(), saved.getSigningTime().toInstant());
-        }
-    }
-
-    @Nested
     class GetTests {
 
         @Test
         void returnsExistingRecord() throws NotFoundException {
             // given
-            SigningRecordDto saved = signingRecordService.saveSigningRecord(
-                    aSigningRecord()
-                            .withSigningProfile(defaultProfile)
-                            .build());
-            SecuredUUID savedUuid = SecuredUUID.fromString(saved.getUuid());
+            SigningRecord saved = aSigningRecord()
+                    .withSigningProfile(defaultProfile)
+                    .build();
+            signingRecordWriter.insert(saved);
+            SecuredUUID savedUuid = SecuredUUID.fromUUID(saved.getUuid());
 
             // when
             SigningRecordDto found = signingRecordService.getSigningRecord(savedUuid);
 
             // then
-            assertEquals(saved.getUuid(), found.getUuid());
+            assertEquals(saved.getUuid().toString(), found.getUuid());
         }
 
         @Test
@@ -162,8 +139,8 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
         @Test
         void returnsAllSavedRecords() {
             // given
-            signingRecordService.saveSigningRecord(aSigningRecord().withSigningProfile(defaultProfile).build());
-            signingRecordService.saveSigningRecord(aSigningRecord().withSigningProfile(defaultProfile).build());
+            signingRecordWriter.insert(aSigningRecord().withSigningProfile(defaultProfile).build());
+            signingRecordWriter.insert(aSigningRecord().withSigningProfile(defaultProfile).build());
             var searchRequest = new SearchRequestDto();
             SecurityFilter filter = new SecurityFilter();
 
@@ -185,18 +162,20 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
                 throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
             // given
             var targetProfile = createSigningProfile("target-profile");
-            signingRecordService.saveSigningRecord(aSigningRecord().withSigningProfile(targetProfile).build());
-            signingRecordService.saveSigningRecord(aSigningRecord().withSigningProfile(defaultProfile).build());
+            signingRecordWriter.insert(aSigningRecord().withSigningProfile(targetProfile).build());
+            signingRecordWriter.insert(aSigningRecord().withSigningProfile(defaultProfile).build());
 
             SecurityFilter filter = new SecurityFilter();
+            SearchRequestDto searchRequest = new SearchRequestDto();
 
             // when
-            var records = signingRecordService.listSigningRecordsAssociatedWithSigningProfile(
-                    SecuredUUID.fromString(targetProfile.getUuid()),
+            var records = signingRecordService.listSigningRecordsForProfile(
+                    UUID.fromString(targetProfile.getUuid()),
+                    searchRequest,
                     filter);
 
             // then
-            assertEquals(1, records.size());
+            assertEquals(1, records.getTotalItems());
         }
 
         @Test
@@ -205,13 +184,16 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
             // given
             var profileWithNoRecords = createSigningProfile("profile-with-no-records");
             SecurityFilter filter = new SecurityFilter();
+            SearchRequestDto searchRequest = new SearchRequestDto();
 
             // when
-            var records = signingRecordService.listSigningRecordsAssociatedWithSigningProfile(
-                    SecuredUUID.fromString(profileWithNoRecords.getUuid()), filter);
+            var records = signingRecordService.listSigningRecordsForProfile(
+                    UUID.fromString(profileWithNoRecords.getUuid()),
+                    searchRequest,
+                    filter);
 
             // then
-            assertTrue(records.isEmpty());
+            assertTrue(records.getItems().isEmpty());
         }
     }
 
@@ -222,15 +204,15 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
         void returnsTrue_whenRecordExistsForProfileAndVersion() {
             // given
             int version = 1;
-            signingRecordService.saveSigningRecord(
+            signingRecordWriter.insert(
                     aSigningRecord()
                             .withSigningProfile(defaultProfile)
                             .withVersion(version)
                             .build());
-            SecuredUUID profileUuid = SecuredUUID.fromString(defaultProfile.getUuid());
+            UUID profileUuid = UUID.fromString(defaultProfile.getUuid());
 
             // when
-            boolean exists = signingRecordService.doesSigningRecordExistForVersion(profileUuid, version);
+            boolean exists = signingRecordService.doesSigningRecordExistInternal(profileUuid, version);
 
             // then
             assertTrue(exists);
@@ -241,15 +223,15 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
             // given
             int nonExistentVersion = 99;
             int versionWithRecord = 1;
-            signingRecordService.saveSigningRecord(
+            signingRecordWriter.insert(
                     aSigningRecord()
                             .withSigningProfile(defaultProfile)
                             .withVersion(versionWithRecord)
                             .build());
-            SecuredUUID profileUuid = SecuredUUID.fromString(defaultProfile.getUuid());
+            UUID profileUuid = UUID.fromString(defaultProfile.getUuid());
 
             // when
-            boolean exists = signingRecordService.doesSigningRecordExistForVersion(profileUuid, nonExistentVersion);
+            boolean exists = signingRecordService.doesSigningRecordExistInternal(profileUuid, nonExistentVersion);
 
             // then
             assertFalse(exists);
@@ -257,46 +239,42 @@ class SigningRecordServiceImplTest extends BaseSpringBootTest {
     }
 
     @Nested
-    class ValidateTests {
-
-        @Test
-        void throwsUnsupportedOperationException_forExistingRecord() {
-            // given
-            SigningRecordDto saved = signingRecordService.saveSigningRecord(
-                    aSigningRecord().withSigningProfile(defaultProfile).build());
-            SecuredUUID savedUuid = SecuredUUID.fromString(saved.getUuid());
-
-            // when
-            Executable validate = () -> signingRecordService.validateSigningRecord(savedUuid);
-
-            // then
-            assertThrows(UnsupportedOperationException.class, validate);
-        }
-
-        @Test
-        void throwsNotFoundException_forUnknownUuid() {
-            // given
-            SecuredUUID unknownUuid = SecuredUUID.fromString(UUID.randomUUID().toString());
-
-            // when
-            Executable validate = () -> signingRecordService.validateSigningRecord(unknownUuid);
-
-            // then
-            assertThrows(NotFoundException.class, validate);
-        }
-    }
-
-    @Nested
     class SearchableFieldsTests {
 
         @Test
-        void returnsEmptyList() {
+        void returnsPropertyGroupWithAllSigningRecordFields() {
             // when
-            var fields = signingRecordService.getSearchableFieldInformation();
+            List<SearchFieldDataByGroupDto> groups = signingRecordService.getSearchableFieldInformation();
 
             // then
-            assertNotNull(fields);
-            assertTrue(fields.isEmpty());
+            assertNotNull(groups);
+            assertEquals(1, groups.stream()
+                    .filter(g -> g.getFilterFieldSource() == FilterFieldSource.PROPERTY)
+                    .count());
+
+            List<SearchFieldDataDto> propertyFields = propertyFieldsOf(groups);
+            assertEquals(FilterField.getEnumsForResource(Resource.SIGNING_RECORD).size(), propertyFields.size());
+        }
+
+        @Test
+        void exposesSigningProfileNamesInSigningProfileField() {
+            // when
+            List<SearchFieldDataByGroupDto> groups = signingRecordService.getSearchableFieldInformation();
+
+            // then
+            SearchFieldDataDto signingProfileField = propertyFieldsOf(groups).stream()
+                    .filter(f -> f.getFieldIdentifier().equals(FilterField.SIGNING_RECORD_SIGNING_PROFILE.name()))
+                    .findFirst()
+                    .orElseThrow();
+            assertTrue(((List<?>) signingProfileField.getValue()).contains(defaultProfile.getName()));
+        }
+
+        private List<SearchFieldDataDto> propertyFieldsOf(List<SearchFieldDataByGroupDto> groups) {
+            return groups.stream()
+                    .filter(g -> g.getFilterFieldSource() == FilterFieldSource.PROPERTY)
+                    .map(SearchFieldDataByGroupDto::getSearchFieldData)
+                    .flatMap(List::stream)
+                    .toList();
         }
     }
 }

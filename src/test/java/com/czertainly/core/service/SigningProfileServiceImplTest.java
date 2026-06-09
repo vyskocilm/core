@@ -131,6 +131,7 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.time.OffsetDateTime;
@@ -232,7 +233,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
         record.setName("seed-" + profileUuid + "-v" + version);
         record.setSigningProfileUuid(profileUuid);
         record.setSigningProfileVersion(version);
-        record.setSigningTime(OffsetDateTime.now());
+        record.setSigningTime(Instant.now());
         signingRecordRepository.saveAndFlush(record);
     }
 
