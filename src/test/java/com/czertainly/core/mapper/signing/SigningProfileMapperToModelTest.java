@@ -54,6 +54,7 @@ class SigningProfileMapperToModelTest {
         assertEquals(1, model.version());
         assertTrue(model.enabled());
         assertEquals(List.of(SigningProtocol.TSP), model.enabledProtocols());
+        assertEquals(TSP_UUID, model.tspProfileUuid());
 
         StaticKeyManagedSigning scheme = assertInstanceOf(StaticKeyManagedSigning.class, model.signingScheme());
         assertEquals(CERT_UUID, scheme.certificateUuid());
@@ -98,6 +99,7 @@ class SigningProfileMapperToModelTest {
                 SigningProfileMapper.toManagedTimestampingModel(header, version, List.of(), List.of());
 
         assertTrue(model.enabledProtocols().isEmpty());
+        assertNull(model.tspProfileUuid());
     }
 
     @Test

@@ -21,11 +21,13 @@ import com.otilm.api.model.common.PaginationResponseDto;
 import com.otilm.api.model.core.search.SearchFieldDataByGroupDto;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.model.signing.SigningProfileModel;
+import com.czertainly.core.model.signing.TspProfileModel;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.model.SecuredList;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface SigningProfileService extends ResourceExtensionService {
@@ -47,6 +49,18 @@ public interface SigningProfileService extends ResourceExtensionService {
     // The model is a sealed generic record whose concrete type parameters are resolved by the caller via pattern matching.
     @SuppressWarnings("java:S1452")
     SigningProfileModel<?, ?> getSigningProfileModel(String name) throws NotFoundException, IllegalStateException;
+
+    /**
+     * Resolves the governing TSP profile for a request targeting {@code /v1/protocols/tsp/signingProfiles/{name}/sign} route,
+     * without any authorization check.
+     *
+     * <p>Intended for use by {@code TspAuthenticationFilter}, which runs before a {@code SecurityContext} exists.
+     * Returns {@link java.util.Optional#empty()} when the Signing Profile exists but is not linked to any
+     * TSP Profile.
+     *
+     * @throws NotFoundException if no Signing Profile with the given name exists, or the linked TSP Profile can no longer be resolved.
+     */
+    Optional<TspProfileModel> resolveTspProfileForSigningProfileAuthentication(String signingProfileName) throws NotFoundException;
 
     List<String> findAllNames();
 

@@ -41,6 +41,7 @@ import com.czertainly.core.dao.repository.CryptographicKeyRepository;
 import com.czertainly.core.dao.repository.TokenInstanceReferenceRepository;
 import com.czertainly.core.dao.repository.TokenProfileRepository;
 import com.czertainly.core.api.tsp.TspControllerImpl;
+import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.service.SigningProfileService;
 import com.czertainly.core.service.TspProfileService;
 import com.czertainly.core.signing.tsa.TimestampTokenTestUtil;
@@ -502,7 +503,9 @@ public class TspProtocolFlowITest extends BaseSpringBootTest {
         request.setSigningScheme(scheme);
         request.setWorkflow(workflow);
 
-        return UUID.fromString(signingProfileService.createSigningProfile(request).getUuid());
+        UUID signingProfileUuid = UUID.fromString(signingProfileService.createSigningProfile(request).getUuid());
+        signingProfileService.enableSigningProfile(SecuredUUID.fromUUID(signingProfileUuid));
+        return signingProfileUuid;
     }
 
     /** Returns the signing-operation attributes required for {@code keyAlgorithm}'s profile. */
@@ -520,7 +523,8 @@ public class TspProtocolFlowITest extends BaseSpringBootTest {
         request.setDescription(description);
         request.setDefaultSigningProfileUuid(defaultSigningProfileUuid);
 
-        tspProfileService.createTspProfile(request);
+        UUID tspProfileUuid = UUID.fromString(tspProfileService.createTspProfile(request).getUuid());
+        tspProfileService.enableTspProfile(SecuredUUID.fromUUID(tspProfileUuid));
     }
 
     // ── Test helpers ──────────────────────────────────────────────────────────

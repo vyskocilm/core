@@ -109,6 +109,12 @@ class TsaServiceImplTest extends BaseSpringBootTest {
         version.setAllowedPolicyIds(allowedPolicyIds);
         signingProfileVersionRepository.saveAndFlush(version);
 
+        // The indirect signing-profile route is authorized against the linked (enabled) TSP Profile,
+        // so every signing profile used by these dispatch/validation tests needs a TSP Profile back-link.
+        TspProfile linkedTspProfile = createTspProfileFor(name + "-tsp", profile);
+        profile.setTspProfile(linkedTspProfile);
+        profile = signingProfileRepository.saveAndFlush(profile);
+
         return profile;
     }
 

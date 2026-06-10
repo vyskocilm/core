@@ -25,6 +25,7 @@ public final class SigningProfileModelBuilder {
             UUID.fromString("00000000-0000-0000-0000-000000000003"), List.of());
     private SigningRecordPolicyModel recordPolicy = new SigningRecordPolicyModel(
             true, false, false, false, false, null, false, SigningRecordPersistenceMode.DEFERRED_DURABLE);
+    private UUID tspProfileUuid = null;
 
     public static SigningProfileModelBuilder aSigningProfile() {
         return new SigningProfileModelBuilder();
@@ -48,8 +49,10 @@ public final class SigningProfileModelBuilder {
         return this;
     }
 
+    public SigningProfileModelBuilder tspProfileUuid(UUID v) { this.tspProfileUuid = v; return this; }
+
     @SuppressWarnings({"unchecked", "java:S119"})
     public <W extends SigningWorkflow, SM extends SigningSchemeModel> SigningProfileModel<W, SM> build() {
-        return new SigningProfileModel<>(uuid, name, description, version, enabled, enabledProtocols, (W) workflow, (SM) signingScheme, recordPolicy);
+        return new SigningProfileModel<>(uuid, name, description, version, enabled, enabledProtocols, (W) workflow, (SM) signingScheme, recordPolicy, tspProfileUuid);
     }
 }

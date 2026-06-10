@@ -157,7 +157,8 @@ public class SigningProfileMapper {
                 version.getVersion(), header.isEnabled(), protocols,
                 buildManagedTimestampingWorkflowModel(header, version, signatureFormatterConnectorAttributes),
                 buildManagedSchemeModel(version, signingOperationAttributes),
-                buildRecordPolicyModel(version));
+                buildRecordPolicyModel(version),
+                header.getTspProfileUuid());
     }
 
     public static SigningProfileListDto toListDto(SigningProfile profile) {
@@ -182,7 +183,7 @@ public class SigningProfileMapper {
             dto.setName(profile.getTspProfile().getName());
             dto.setAvailable(true);
             dto.setSigningUrl(ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString()
-                    + "/v1/protocols/tsp/signingProfile/" + profile.getName() + "/sign");
+                    + "/v1/protocols/tsp/signingProfiles/" + profile.getName() + "/sign");
         } else {
             dto.setAvailable(false);
         }

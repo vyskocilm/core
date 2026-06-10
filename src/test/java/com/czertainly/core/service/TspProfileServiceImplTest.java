@@ -18,12 +18,18 @@ import com.otilm.api.model.common.attribute.common.properties.CustomAttributePro
 import com.otilm.api.model.common.attribute.v3.CustomAttributeV3;
 import com.otilm.api.model.common.attribute.v3.content.StringAttributeContentV3;
 import com.otilm.api.model.core.auth.Resource;
+import com.otilm.api.model.core.signing.TspAuthenticationMethod;
 import com.czertainly.core.dao.entity.AttributeDefinition;
 import com.czertainly.core.dao.entity.AttributeRelation;
+import com.czertainly.core.dao.entity.VaultInstance;
+import com.czertainly.core.dao.entity.VaultProfile;
 import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.repository.AttributeDefinitionRepository;
 import com.czertainly.core.dao.repository.AttributeRelationRepository;
+import com.czertainly.core.dao.repository.VaultInstanceRepository;
+import com.czertainly.core.dao.repository.VaultProfileRepository;
 import com.czertainly.core.dao.repository.signing.TspProfileRepository;
+import com.czertainly.core.model.signing.TspProfileModel;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.util.BaseSpringBootTest;
@@ -60,6 +66,12 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Autowired
     private AttributeRelationRepository attributeRelationRepository;
+
+    @Autowired
+    private VaultProfileRepository vaultProfileRepository;
+
+    @Autowired
+    private VaultInstanceRepository vaultInstanceRepository;
 
     private TspProfile savedTspProfile;
 
@@ -140,6 +152,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         Assertions.assertEquals(savedTspProfile.getUuid().toString(), dto.getUuid());
         Assertions.assertEquals(savedTspProfile.getName(), dto.getName());
         Assertions.assertEquals(savedTspProfile.getDescription(), dto.getDescription());
+        Assertions.assertNull(dto.getVaultProfile());
     }
 
     @Test
@@ -500,6 +513,16 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Resolve for authentication (no authorization advice)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void resolveForAuthentication_returnsModelWithoutAuthorization() throws Exception {
+        TspProfileModel model = tspService.resolveTspProfileForAuthentication(savedTspProfile.getName());
+        Assertions.assertEquals(savedTspProfile.getName(), model.name());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Bulk-op catch-block entity-name branches (profile != null path)
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -543,5 +566,35 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         Assertions.assertEquals(savedTspProfile.getUuid().toString(), messages.getFirst().getUuid());
         Assertions.assertEquals(savedTspProfile.getName(), messages.getFirst().getName());
         Assertions.assertNotNull(messages.getFirst().getMessage());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Vault profile nesting in create/update response
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void testCreateTspProfile_withVaultProfile_returnsNestedVaultProfile() throws Exception {
+        VaultInstance vaultInstance = new VaultInstance();
+        vaultInstance.setName("testInstance");
+        vaultInstanceRepository.save(vaultInstance);
+
+        VaultProfile vaultProfile = new VaultProfile();
+        vaultProfile.setName("testVaultProfile");
+        vaultProfile.setVaultInstance(vaultInstance);
+        vaultProfile.setVaultInstanceUuid(vaultInstance.getUuid());
+        vaultProfileRepository.save(vaultProfile);
+
+        TspProfileRequestDto request = new TspProfileRequestDto();
+        request.setName("tsp-with-vault");
+        request.setAllowedAuthenticationMethods(List.of(TspAuthenticationMethod.BASIC_PASSWORD));
+        request.setVaultProfileUuid(vaultProfile.getUuid());
+
+        TspProfileDto dto = tspService.createTspProfile(request);
+
+        Assertions.assertNotNull(dto.getVaultProfile(), "vaultProfile in response DTO must not be null");
+        Assertions.assertEquals(vaultProfile.getUuid().toString(), dto.getVaultProfile().getUuid());
+        Assertions.assertEquals("testVaultProfile", dto.getVaultProfile().getName());
+        Assertions.assertNotNull(dto.getVaultProfile().getVaultInstance());
+        Assertions.assertEquals(vaultInstance.getUuid().toString(), dto.getVaultProfile().getVaultInstance().getUuid());
     }
 }

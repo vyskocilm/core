@@ -50,6 +50,7 @@ import com.czertainly.core.config.cache.CacheEvictor;
 import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.service.*;
 import com.czertainly.core.model.signing.SigningProfileModel;
+import com.czertainly.core.model.signing.TspProfileModel;
 import com.czertainly.core.util.SearchHelper;
 import com.otilm.api.model.core.signing.SigningProtocol;
 import com.otilm.api.model.core.signing.signingrecord.SigningRecordListDto;
@@ -276,6 +277,26 @@ public class SigningProfileServiceImpl implements SigningProfileService {
         // Narrow scope: only managed-timestamping profiles are cacheable for now.
         return SigningProfileMapper.toManagedTimestampingModel(
                 profile, currentVersion, signingOperationAttributes, signatureFormatterConnectorAttributes);
+    }
+
+    @Override
+    public Optional<TspProfileModel> resolveTspProfileForSigningProfileAuthentication(String signingProfileName) throws NotFoundException {
+        String linkedTspProfileName = self.loadLinkedTspProfileName(signingProfileName);
+        if (linkedTspProfileName == null) {
+            return Optional.empty();
+        }
+        return Optional.of(tspProfileService.resolveTspProfileForAuthentication(linkedTspProfileName));
+    }
+
+    // Self-invoked helper to apply @Transactional.
+    @Transactional(readOnly = true)
+    String loadLinkedTspProfileName(String signingProfileName) throws NotFoundException {
+        SigningProfile profile = signingProfileRepository.findByName(signingProfileName)
+                .orElseThrow(() -> new NotFoundException(SigningProfile.class, signingProfileName));
+        if (profile.getTspProfileUuid() == null) {
+            return null;
+        }
+        return profile.getTspProfile().getName();
     }
 
     /**

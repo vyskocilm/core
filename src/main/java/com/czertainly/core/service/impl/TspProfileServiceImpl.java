@@ -23,9 +23,11 @@ import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.util.SearchHelper;
 import com.czertainly.core.attribute.engine.AttributeEngine;
 import com.czertainly.core.dao.entity.Audited_;
+import com.czertainly.core.dao.entity.VaultProfile;
 import com.czertainly.core.dao.entity.signing.TspProfile;
 import com.czertainly.core.dao.entity.signing.TspProfile_;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
+import com.czertainly.core.dao.entity.signing.TspProfileBasicCredential;
 import com.czertainly.core.dao.repository.signing.TspProfileRepository;
 import com.czertainly.core.mapper.signing.TspProfileMapper;
 import com.otilm.core.model.auth.ResourceAction;
@@ -34,7 +36,9 @@ import com.czertainly.core.security.authz.ExternalAuthorization;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.TspProfileService;
+import com.czertainly.core.service.SecretService;
 import com.czertainly.core.service.SigningProfileService;
+import com.czertainly.core.service.VaultProfileService;
 import com.czertainly.core.service.model.SecuredList;
 import com.czertainly.core.util.FilterPredicatesBuilder;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -55,6 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -66,7 +71,9 @@ public class TspProfileServiceImpl implements TspProfileService {
     private CacheEvictor cacheEvictor;
     private TspProfileServiceImpl self;
     private SigningProfileService signingProfileService;
+    private VaultProfileService vaultProfileService;
     private TspProfileRepository tspProfileRepository;
+    private SecretService secretService;
 
     @Override
     @ExternalAuthorization(resource = Resource.TSP_PROFILE, action = ResourceAction.LIST)
@@ -125,6 +132,17 @@ public class TspProfileServiceImpl implements TspProfileService {
         return self.loadTspProfileModel(name);
     }
 
+    @Override
+    public TspProfileModel resolveTspProfileForAuthentication(String name) throws NotFoundException {
+        return self.loadTspProfileModel(name);
+    }
+
+    // DEFERRED OPTIMIZATION (TSP profile cache, UUID key): this cache is keyed by name only. The indirect
+    // (Signing Profile) authentication path holds a stable tspProfileUuid via the SP->TSP link but can only
+    // address this cache by the mutable name, so it must translate uuid->name through a DB read every request
+    // (see SigningProfileServiceImpl#loadLinkedTspProfileName). Adding a parallel UUID-keyed view here would
+    // let that path resolve the model from the stable uuid with zero DB access and no rename-staleness hazard.
+    // Deferred: it widens the cache-coherence surface (every eviction site must then evict both keys).
     @Cacheable(value = CacheConfig.TSP_PROFILE_CACHE, key = "#name", sync = true)
     @Transactional(readOnly = true)
     public TspProfileModel loadTspProfileModel(String name) throws NotFoundException {
@@ -132,7 +150,18 @@ public class TspProfileServiceImpl implements TspProfileService {
                 .orElseThrow(() -> new NotFoundException("TSP Profile not found: " + name));
 
         List<ResponseAttribute> customAttributes = attributeEngine.getObjectCustomAttributesContent(Resource.TSP_PROFILE, tspConfiguration.getUuid());
-        return TspProfileMapper.toModel(tspConfiguration, customAttributes);
+        return TspProfileMapper.toModel(tspConfiguration, customAttributes, loadLatestFingerprints(tspConfiguration));
+    }
+
+    /**
+     * Gets the latest-version fingerprints for the profile's Basic credentials.
+     */
+    private Map<UUID, String> loadLatestFingerprints(TspProfile profile) {
+        List<UUID> secretUuids = profile.getBasicCredentials().stream()
+                .map(TspProfileBasicCredential::getSecretUuid)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        return secretService.getLatestFingerprintsByUuid(secretUuids);
     }
 
     @Override
@@ -142,9 +171,9 @@ public class TspProfileServiceImpl implements TspProfileService {
         if (tspProfileRepository.findByName(request.getName()).isPresent()) {
             throw new AlreadyExistException("TSP Profile with name '" + request.getName() + "' already exists.");
         }
-        SigningProfile defaultSigningProfile = validateCreateUpdateRequest(request);
+        ValidatedReferences refs = validateCreateUpdateRequest(request);
         TspProfile profile = new TspProfile();
-        return updateAndMapToDto(profile, request, defaultSigningProfile);
+        return updateAndMapToDto(profile, request, refs);
     }
 
     @Override
@@ -159,12 +188,12 @@ public class TspProfileServiceImpl implements TspProfileService {
             throw new AlreadyExistException("TSP Profile with name '" + request.getName() + "' already exists.");
         }
 
-        SigningProfile defaultSigningProfile = validateCreateUpdateRequest(request);
+        ValidatedReferences refs = validateCreateUpdateRequest(request);
         evictTspProfileCache(oldName);
         if (!oldName.equals(request.getName())) {
             evictTspProfileCache(request.getName());
         }
-        return updateAndMapToDto(profile, request, defaultSigningProfile);
+        return updateAndMapToDto(profile, request, refs);
     }
 
     @Override
@@ -310,7 +339,9 @@ public class TspProfileServiceImpl implements TspProfileService {
     // Private helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-    private SigningProfile validateCreateUpdateRequest(TspProfileRequestDto request) throws NotFoundException, ValidationException {
+    private record ValidatedReferences(SigningProfile defaultSigningProfile, VaultProfile vaultProfile) {}
+
+    private ValidatedReferences validateCreateUpdateRequest(TspProfileRequestDto request) throws NotFoundException, ValidationException {
         attributeEngine.validateCustomAttributesContent(Resource.TSP_PROFILE, request.getCustomAttributes());
 
         SigningProfile defaultSigningProfile = null;
@@ -323,13 +354,20 @@ public class TspProfileServiceImpl implements TspProfileService {
             }
         }
 
-        return defaultSigningProfile;
+        VaultProfile vaultProfile = null;
+        if (request.getVaultProfileUuid() != null) {
+            vaultProfile = vaultProfileService.getVaultProfileEntity(SecuredUUID.fromUUID(request.getVaultProfileUuid()));
+        }
+
+        return new ValidatedReferences(defaultSigningProfile, vaultProfile);
     }
 
-    private TspProfileDto updateAndMapToDto(TspProfile profile, TspProfileRequestDto request, SigningProfile defaultSigningProfile) throws AlreadyExistException, AttributeException, NotFoundException {
+    private TspProfileDto updateAndMapToDto(TspProfile profile, TspProfileRequestDto request, ValidatedReferences refs) throws AlreadyExistException, AttributeException, NotFoundException {
         profile.setName(request.getName());
         profile.setDescription(request.getDescription());
-        profile.setDefaultSigningProfile(defaultSigningProfile);
+        profile.setDefaultSigningProfile(refs.defaultSigningProfile());
+        profile.setAllowedAuthenticationMethods(new ArrayList<>(request.getAllowedAuthenticationMethods()));
+        profile.setVaultProfile(refs.vaultProfile());
         TspProfile saved;
         try {
             saved = tspProfileRepository.saveAndFlush(profile);
@@ -399,6 +437,16 @@ public class TspProfileServiceImpl implements TspProfileService {
     @Autowired
     public void setSigningProfileService(SigningProfileService signingProfileService) {
         this.signingProfileService = signingProfileService;
+    }
+
+    @Autowired
+    public void setVaultProfileService(VaultProfileService vaultProfileService) {
+        this.vaultProfileService = vaultProfileService;
+    }
+
+    @Autowired
+    public void setSecretService(SecretService secretService) {
+        this.secretService = secretService;
     }
 
     @Lazy

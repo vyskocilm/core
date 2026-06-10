@@ -6,10 +6,14 @@ import com.otilm.api.model.client.signing.protocols.tsp.TspProfileDto;
 import com.otilm.api.model.client.signing.protocols.tsp.TspProfileListDto;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.dao.entity.signing.TspProfile;
+import com.czertainly.core.dao.entity.signing.TspProfileBasicCredential;
 import com.czertainly.core.model.signing.TspProfileModel;
+import com.czertainly.core.model.signing.TspProfileModel.BasicCredentialRef;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class TspProfileMapper {
 
@@ -29,16 +33,18 @@ public class TspProfileMapper {
             dto.setDefaultSigningProfile(signingProfileDto);
         }
         dto.setCustomAttributes(customAttributes);
+        dto.setAllowedAuthenticationMethods(List.copyOf(profile.getAllowedAuthenticationMethods()));
+        if (profile.getVaultProfile() != null) {
+            dto.setVaultProfile(profile.getVaultProfile().mapToDto());
+        }
         return dto;
     }
 
-    public static TspProfileModel toModel(TspProfile profile, List<ResponseAttribute> customAttributes) {
+    public static TspProfileModel toModel(TspProfile profile, List<ResponseAttribute> customAttributes, Map<UUID, String> fingerprintsBySecretUuid) {
         SigningProfile defaultSigningProfile = profile.getDefaultSigningProfile();
-        String signingUrl = null;
-        if (defaultSigningProfile != null) {
-            signingUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString()
-                    + "/v1/protocols/tsp/" + profile.getName() + "/sign";
-        }
+        List<BasicCredentialRef> basicCredentialRefs = profile.getBasicCredentials().stream()
+                .map(c -> new BasicCredentialRef(c.getUsername(), c.getSecretUuid(), c.getMappedUserUuid(), fingerprintsBySecretUuid.get(c.getSecretUuid())))
+                .toList();
         return new TspProfileModel(
                 profile.getUuid(),
                 profile.getName(),
@@ -46,8 +52,10 @@ public class TspProfileMapper {
                 profile.isEnabled(),
                 defaultSigningProfile != null ? defaultSigningProfile.getUuid() : null,
                 defaultSigningProfile != null ? defaultSigningProfile.getName() : null,
-                signingUrl,
-                customAttributes
+                customAttributes,
+                List.copyOf(profile.getAllowedAuthenticationMethods()),
+                basicCredentialRefs,
+                profile.getVaultProfileUuid()
         );
     }
 

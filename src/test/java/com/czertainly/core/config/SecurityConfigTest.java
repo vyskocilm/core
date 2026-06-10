@@ -2,6 +2,7 @@ package com.czertainly.core.config;
 
 import com.otilm.api.model.core.settings.SettingsSection;
 import com.otilm.api.model.core.settings.authentication.AuthenticationSettingsDto;
+import com.czertainly.core.auth.oauth2.CzertainlyJwtDecoder;
 import com.czertainly.core.security.authn.client.AuthenticationCache;
 import com.czertainly.core.security.oauth2.OAuth2TestUtil;
 import com.czertainly.core.settings.SettingsCache;
@@ -21,7 +22,6 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.web.http.SessionRepositoryFilter;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -57,7 +57,7 @@ class SecurityConfigTest extends BaseSpringBootTestNoAuth {
     MockMvc mvc;
 
     @MockitoBean
-    JwtDecoder jwtDecoder;
+    CzertainlyJwtDecoder jwtDecoder;
 
     @Autowired
     SettingsCache settingsCache;
