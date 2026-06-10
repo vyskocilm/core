@@ -20,7 +20,7 @@ import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.v2.ConnectorService;
 import com.czertainly.core.service.writer.signingrecord.SigningRecordWriter;
 import com.czertainly.core.util.BaseSpringBootTest;
-import com.czertainly.core.util.SearchRequestDtoBuilder;
+import com.czertainly.core.util.builders.SearchRequestDtoBuilder;
 import com.czertainly.core.util.mocks.SignerConnectorMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -185,7 +185,7 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
             // given
             seedRecordsAcrossProfilesAndVersions();
             SearchRequestDto onlyAlphaV1 = SearchRequestDtoBuilder.aSearchRequest()
-                    .propertyFilter(FilterField.SIGNING_RECORD_NAME.name(), FilterConditionOperator.EQUALS, ALPHA_RECORD_V1)
+                    .withPropertyFilter(FilterField.SIGNING_RECORD_NAME.name(), FilterConditionOperator.EQUALS, ALPHA_RECORD_V1)
                     .build();
 
             // when
@@ -202,7 +202,7 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
             // given
             seedRecordsAcrossProfilesAndVersions();
             SearchRequestDto onlyAlphaProfile = SearchRequestDtoBuilder.aSearchRequest()
-                    .propertyFilter(FilterField.SIGNING_RECORD_SIGNING_PROFILE.name(), FilterConditionOperator.EQUALS, ALPHA_PROFILE)
+                    .withPropertyFilter(FilterField.SIGNING_RECORD_SIGNING_PROFILE.name(), FilterConditionOperator.EQUALS, ALPHA_PROFILE)
                     .build();
 
             // when
@@ -221,7 +221,7 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
             // given
             seedRecordsAcrossProfilesAndVersions();
             SearchRequestDto onlyVersion2 = SearchRequestDtoBuilder.aSearchRequest()
-                    .propertyFilter(FilterField.SIGNING_RECORD_SIGNING_PROFILE_VERSION.name(), FilterConditionOperator.EQUALS, VERSION_2)
+                    .withPropertyFilter(FilterField.SIGNING_RECORD_SIGNING_PROFILE_VERSION.name(), FilterConditionOperator.EQUALS, VERSION_2)
                     .build();
 
             // when
@@ -238,8 +238,8 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
             // given
             seedRecordsAcrossProfilesAndVersions();
             SearchRequestDto firstPageOfTwo = SearchRequestDtoBuilder.aSearchRequest()
-                    .pageNumber(1)
-                    .itemsPerPage(2)
+                    .withPageNumber(1)
+                    .withItemsPerPage(2)
                     .build();
 
             // when
@@ -295,7 +295,7 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
             var retrievedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
             var requestedByUuid = UUID.fromString("99999999-9999-9999-9999-999999999999");
             var requestedByUsername = "alice";
-            SigningRecord record = aSigningRecord()
+            SigningRecord signingRecord = aSigningRecord()
                     .withSigningProfile(defaultProfile)
                     .withName(ALPHA_RECORD_V1)
                     .withSigningTime(signingTime)
@@ -307,18 +307,18 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
                     .withRequestedByUsername(requestedByUsername)
                     .withSignedDocumentRetrievedAt(retrievedAt)
                     .build();
-            signingRecordWriter.insert(record);
+            signingRecordWriter.insert(signingRecord);
 
             // when
-            SigningRecordDto dto = signingRecordService.getSigningRecord(SecuredUUID.fromUUID(record.getUuid()));
+            SigningRecordDto dto = signingRecordService.getSigningRecord(SecuredUUID.fromUUID(signingRecord.getUuid()));
 
             // then
-            assertEquals(record.getUuid().toString(), dto.getUuid());
+            assertEquals(signingRecord.getUuid().toString(), dto.getUuid());
             assertEquals(ALPHA_RECORD_V1, dto.getName());
             assertEquals(signingTime, dto.getSigningTime());
-            assertArrayEquals(record.getSignatureValue(), dto.getSignatureValue());
-            assertArrayEquals(record.getDtbs(), dto.getDtbs());
-            assertArrayEquals(record.getSignedDocument(), dto.getSignedDocument());
+            assertArrayEquals(signingRecord.getSignatureValue(), dto.getSignatureValue());
+            assertArrayEquals(signingRecord.getDtbs(), dto.getDtbs());
+            assertArrayEquals(signingRecord.getSignedDocument(), dto.getSignedDocument());
             // requestMetadataJson is stored in a JSONB column, which re-serializes (normalizes whitespace),
             // so assert on content rather than byte-exact equality
             assertTrue(dto.getRequestMetadataJson().contains("\"alg\""));

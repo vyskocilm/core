@@ -97,6 +97,5 @@ class BackfillExtendedKeyUsageCriticalTest extends BaseMigrationTest {
         cert.setExtendedKeyUsageCritical(null); // simulate pre-migration state
         cert.setCertificateContent(content);
         return certificateRepository.save(cert);
-
     }
 }

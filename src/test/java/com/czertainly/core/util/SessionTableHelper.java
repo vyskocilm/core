@@ -2,12 +2,7 @@ package com.czertainly.core.util;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * Shared test utility for creating / deleting Spring Session JDBC tables in the in-memory / test database.
- */
-public final class SessionTableHelper {
-
-    private SessionTableHelper() {}
+public class SessionTableHelper {
 
     public static void createSessionTables(JdbcTemplate jdbcTemplate) {
         jdbcTemplate.execute("""

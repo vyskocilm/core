@@ -1,5 +1,6 @@
 package com.czertainly.core.mapper.signing;
 
+import com.czertainly.core.model.signing.SigningRecordPolicyModel;
 import com.otilm.api.model.client.attribute.RequestAttribute;
 import com.otilm.api.model.client.attribute.ResponseAttribute;
 import com.otilm.api.model.client.signing.profile.SigningProfileDto;
@@ -18,7 +19,6 @@ import com.otilm.api.model.core.signing.SigningProtocol;
 import com.czertainly.core.dao.entity.signing.SigningProfile;
 import com.czertainly.core.dao.entity.signing.SigningProfileVersion;
 import com.czertainly.core.model.signing.SigningProfileModel;
-import com.czertainly.core.model.signing.SigningRecordPolicyModel;
 import com.czertainly.core.model.signing.scheme.ManagedSigning;
 import com.czertainly.core.model.signing.scheme.OneTimeKeyManagedSigning;
 import com.czertainly.core.model.signing.scheme.StaticKeyManagedSigning;

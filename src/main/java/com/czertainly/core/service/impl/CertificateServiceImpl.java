@@ -1028,7 +1028,7 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
                 certificate = getX509(certificateData);
             } catch (CertificateException e) {
                 String message = "Failed to get parse the certificate " + certificateData + " > " + e.getMessage();
-                log.error("message");
+                log.error(message);
                 throw new com.otilm.api.exception.CertificateException(message);
             }
             try {
@@ -1041,7 +1041,7 @@ public class CertificateServiceImpl implements CertificateService, AttributeReso
                 }
             } catch (NoSuchAlgorithmException | CertificateException e) {
                 String message = "Failed to get thumbprint for certificate " + certificate.getSerialNumber() + " > " + e.getMessage();
-                log.error("message");
+                log.error(message);
                 throw new com.otilm.api.exception.CertificateException(message);
             }
 

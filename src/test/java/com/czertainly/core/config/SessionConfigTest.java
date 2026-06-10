@@ -93,7 +93,6 @@ class SessionConfigTest extends BaseSpringBootTestNoAuth {
         SessionTableHelper.dropSessionTables(jdbcTemplate);
     }
 
-
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private byte[] buildTspRequest() throws Exception {

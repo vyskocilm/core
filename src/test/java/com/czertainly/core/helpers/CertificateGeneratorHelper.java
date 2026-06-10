@@ -292,19 +292,19 @@ public class CertificateGeneratorHelper {
         private final KeyPair endEntityCertificateKeyPair;
         private final X509Certificate endEntityCertificate;
 
-        public CertificateChainInfo(KeyPair caCertificateKeyPair, X509Certificate caCertificate, KeyPair endEntityCertificateKeyPair, X509Certificate endEntityCertificate) {
-            this.caCertificateKeyPair = caCertificateKeyPair;
-            this.caCertificate = caCertificate;
-            this.endEntityCertificateKeyPair = endEntityCertificateKeyPair;
-            this.endEntityCertificate = endEntityCertificate;
-        }
-
         public String getCaCertificateBase64Encoded() throws CertificateEncodingException {
             return Base64.getEncoder().encodeToString(caCertificate.getEncoded());
         }
 
         public String getEndEntityCertificateBase64Encoded() throws CertificateEncodingException {
             return Base64.getEncoder().encodeToString(endEntityCertificate.getEncoded());
+        }
+
+        public CertificateChainInfo(KeyPair caCertificateKeyPair, X509Certificate caCertificate, KeyPair endEntityCertificateKeyPair, X509Certificate endEntityCertificate) {
+            this.caCertificateKeyPair = caCertificateKeyPair;
+            this.caCertificate = caCertificate;
+            this.endEntityCertificateKeyPair = endEntityCertificateKeyPair;
+            this.endEntityCertificate = endEntityCertificate;
         }
     }
 }
