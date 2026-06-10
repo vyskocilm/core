@@ -46,7 +46,7 @@ public interface SigningProfileService extends ResourceExtensionService {
 
     // The model is a sealed generic record whose concrete type parameters are resolved by the caller via pattern matching.
     @SuppressWarnings("java:S1452")
-    SigningProfileModel<?, ?> getSigningProfileModel(String name) throws NotFoundException;
+    SigningProfileModel<?, ?> getSigningProfileModel(String name) throws NotFoundException, IllegalStateException;
 
     List<String> findAllNames();
 
