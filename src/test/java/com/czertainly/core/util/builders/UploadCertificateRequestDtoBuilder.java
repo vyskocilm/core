@@ -1,6 +1,6 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.certificate.UploadCertificateRequestDto;
+import com.otilm.api.model.client.certificate.UploadCertificateRequestDto;
 
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;

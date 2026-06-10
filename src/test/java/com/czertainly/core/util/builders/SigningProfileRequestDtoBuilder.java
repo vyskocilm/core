@@ -1,12 +1,12 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.attribute.*;
-import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
-import com.czertainly.api.model.client.signing.profile.SigningProfileRequestDto;
-import com.czertainly.api.model.client.signing.profile.scheme.*;
-import com.czertainly.api.model.client.signing.profile.workflow.*;
-import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
-import com.czertainly.api.model.common.enums.cryptography.RsaSignatureScheme;
+import com.otilm.api.model.client.attribute.*;
+import com.otilm.api.model.client.signing.profile.SigningProfileDto;
+import com.otilm.api.model.client.signing.profile.SigningProfileRequestDto;
+import com.otilm.api.model.client.signing.profile.scheme.*;
+import com.otilm.api.model.client.signing.profile.workflow.*;
+import com.otilm.api.model.common.enums.cryptography.DigestAlgorithm;
+import com.otilm.api.model.common.enums.cryptography.RsaSignatureScheme;
 
 import java.util.List;
 import java.util.UUID;

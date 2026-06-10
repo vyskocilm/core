@@ -1,9 +1,9 @@
 package com.czertainly.core.util.mocks;
 
-import com.czertainly.api.model.client.connector.v2.ConnectorInterface;
-import com.czertainly.api.model.client.connector.v2.ConnectorInterfaceInfo;
-import com.czertainly.api.model.client.connector.v2.FeatureFlag;
-import com.czertainly.api.model.client.connector.v2.InfoResponse;
+import com.otilm.api.model.client.connector.v2.ConnectorInterface;
+import com.otilm.api.model.client.connector.v2.ConnectorInterfaceInfo;
+import com.otilm.api.model.client.connector.v2.FeatureFlag;
+import com.otilm.api.model.client.connector.v2.InfoResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -56,7 +56,7 @@ public abstract class BaseConnectorMock {
     /**
      * Stubs {@code GET /v1} — the V1 connector validation endpoint — with the given function groups.
      */
-    protected void stubV1FunctionGroups(List<com.czertainly.api.model.client.connector.InfoResponse> functions) {
+    protected void stubV1FunctionGroups(List<com.otilm.api.model.client.connector.InfoResponse> functions) {
         try {
             server.stubFor(WireMock.get("/v1")
                     .willReturn(WireMock.okJson(OBJECT_MAPPER.writeValueAsString(functions))));

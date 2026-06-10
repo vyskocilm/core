@@ -1,6 +1,6 @@
 package com.czertainly.core.util.seeders;
 
-import com.czertainly.api.model.core.connector.FunctionGroupCode;
+import com.otilm.api.model.core.connector.FunctionGroupCode;
 import com.czertainly.core.dao.entity.FunctionGroup;
 import com.czertainly.core.dao.repository.FunctionGroupRepository;
 import org.springframework.beans.factory.annotation.Autowired;

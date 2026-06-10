@@ -1,11 +1,11 @@
 package com.czertainly.core.util;
 
-import com.czertainly.api.model.core.auth.Resource;
-import com.czertainly.api.model.core.auth.UserDto;
-import com.czertainly.api.model.core.auth.UserProfileDto;
-import com.czertainly.api.model.core.logging.enums.AuthMethod;
+import com.otilm.api.model.core.auth.Resource;
+import com.otilm.api.model.core.auth.UserDto;
+import com.otilm.api.model.core.auth.UserProfileDto;
+import com.otilm.api.model.core.logging.enums.AuthMethod;
 import com.czertainly.core.messaging.jms.producers.AuditLogsProducer;
-import com.czertainly.core.model.auth.ResourceAction;
+import com.otilm.core.model.auth.ResourceAction;
 import com.czertainly.core.security.authn.CzertainlyAuthenticationToken;
 import com.czertainly.core.security.authn.CzertainlyUserDetails;
 import com.czertainly.core.security.authn.client.AuthenticationInfo;

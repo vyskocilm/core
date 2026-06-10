@@ -1,8 +1,8 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.connector.v2.ConnectorVersion;
-import com.czertainly.api.model.core.connector.AuthType;
-import com.czertainly.api.model.core.connector.v2.ConnectorRequestDto;
+import com.otilm.api.model.client.connector.v2.ConnectorVersion;
+import com.otilm.api.model.core.connector.AuthType;
+import com.otilm.api.model.core.connector.v2.ConnectorRequestDto;
 
 public class ConnectorRequestDtoBuilder {
 

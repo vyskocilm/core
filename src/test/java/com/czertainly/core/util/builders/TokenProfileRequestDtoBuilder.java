@@ -1,7 +1,7 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.cryptography.tokenprofile.AddTokenProfileRequestDto;
-import com.czertainly.api.model.core.cryptography.key.KeyUsage;
+import com.otilm.api.model.client.cryptography.tokenprofile.AddTokenProfileRequestDto;
+import com.otilm.api.model.core.cryptography.key.KeyUsage;
 
 import java.util.List;
 

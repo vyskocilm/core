@@ -1,8 +1,8 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.attribute.RequestAttributeV3;
-import com.czertainly.api.model.common.attribute.common.content.AttributeContentType;
-import com.czertainly.api.model.common.attribute.v3.content.StringAttributeContentV3;
+import com.otilm.api.model.client.attribute.RequestAttributeV3;
+import com.otilm.api.model.common.attribute.common.content.AttributeContentType;
+import com.otilm.api.model.common.attribute.v3.content.StringAttributeContentV3;
 
 import java.util.List;
 import java.util.UUID;

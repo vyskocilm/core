@@ -1,7 +1,7 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.attribute.RequestAttribute;
-import com.czertainly.api.model.client.signing.profile.workflow.ContentSigningWorkflowRequestDto;
+import com.otilm.api.model.client.attribute.RequestAttribute;
+import com.otilm.api.model.client.signing.profile.workflow.ContentSigningWorkflowRequestDto;
 
 import java.util.ArrayList;
 import java.util.List;

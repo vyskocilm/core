@@ -1,8 +1,8 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.attribute.RequestAttribute;
-import com.czertainly.api.model.client.signing.profile.workflow.TimestampingWorkflowRequestDto;
-import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
+import com.otilm.api.model.client.attribute.RequestAttribute;
+import com.otilm.api.model.client.signing.profile.workflow.TimestampingWorkflowRequestDto;
+import com.otilm.api.model.common.enums.cryptography.DigestAlgorithm;
 
 import java.util.ArrayList;
 import java.util.List;

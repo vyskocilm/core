@@ -1,8 +1,8 @@
 package com.czertainly.core.api.tsp.parser;
 
-import com.czertainly.api.exception.ValidationException;
-import com.czertainly.api.interfaces.core.tsp.error.TspFailureInfo;
-import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
+import com.otilm.api.exception.ValidationException;
+import com.otilm.api.interfaces.core.tsp.error.TspFailureInfo;
+import com.otilm.api.model.common.enums.cryptography.DigestAlgorithm;
 import com.czertainly.core.signing.tsa.messages.TspRequest;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x509.Extension;

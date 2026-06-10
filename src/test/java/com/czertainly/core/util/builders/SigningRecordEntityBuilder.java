@@ -1,6 +1,6 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
+import com.otilm.api.model.client.signing.profile.SigningProfileDto;
 import com.czertainly.core.dao.entity.signing.SigningRecord;
 
 import java.time.Instant;

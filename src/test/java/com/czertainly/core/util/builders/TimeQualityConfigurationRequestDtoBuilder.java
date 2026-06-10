@@ -1,6 +1,6 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.signing.timequality.TimeQualityConfigurationRequestDto;
+import com.otilm.api.model.client.signing.timequality.TimeQualityConfigurationRequestDto;
 
 import java.time.Duration;
 import java.util.List;

@@ -1,8 +1,8 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.attribute.RequestAttribute;
-import com.czertainly.api.model.client.signing.protocols.tsp.TspProfileDto;
-import com.czertainly.api.model.client.signing.protocols.tsp.TspProfileRequestDto;
+import com.otilm.api.model.client.attribute.RequestAttribute;
+import com.otilm.api.model.client.signing.protocols.tsp.TspProfileDto;
+import com.otilm.api.model.client.signing.protocols.tsp.TspProfileRequestDto;
 
 import java.util.List;
 import java.util.UUID;

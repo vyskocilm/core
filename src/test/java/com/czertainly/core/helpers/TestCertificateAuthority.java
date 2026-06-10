@@ -1,6 +1,6 @@
 package com.czertainly.core.helpers;
 
-import com.czertainly.api.model.common.enums.cryptography.KeyAlgorithm;
+import com.otilm.api.model.common.enums.cryptography.KeyAlgorithm;
 import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.util.CertificateTestUtil;
 import lombok.Getter;

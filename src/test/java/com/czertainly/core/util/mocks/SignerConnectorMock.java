@@ -1,6 +1,6 @@
 package com.czertainly.core.util.mocks;
 
-import com.czertainly.api.model.client.connector.v2.ConnectorInterface;
+import com.otilm.api.model.client.connector.v2.ConnectorInterface;
 
 import java.util.List;
 

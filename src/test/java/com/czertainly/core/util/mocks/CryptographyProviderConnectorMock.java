@@ -1,8 +1,8 @@
 package com.czertainly.core.util.mocks;
 
-import com.czertainly.api.model.client.connector.InfoResponse;
-import com.czertainly.api.model.core.connector.EndpointDto;
-import com.czertainly.api.model.core.connector.FunctionGroupCode;
+import com.otilm.api.model.client.connector.InfoResponse;
+import com.otilm.api.model.core.connector.EndpointDto;
+import com.otilm.api.model.core.connector.FunctionGroupCode;
 import com.github.tomakehurst.wiremock.client.WireMock;
 
 import java.util.ArrayList;

@@ -1,58 +1,58 @@
 package com.czertainly.core.service;
 
-import com.czertainly.api.exception.AlreadyExistException;
-import com.czertainly.api.exception.AttributeException;
-import com.czertainly.api.exception.ConnectorException;
-import com.czertainly.api.exception.NotFoundException;
-import com.czertainly.api.exception.ValidationError;
-import com.czertainly.api.exception.ValidationException;
-import com.czertainly.api.model.client.signing.profile.SigningProfileRequestDto;
-import com.czertainly.api.model.common.BulkActionMessageDto;
-import com.czertainly.api.model.client.attribute.RequestAttribute;
-import com.czertainly.api.model.client.attribute.RequestAttributeV2;
-import com.czertainly.api.model.client.attribute.RequestAttributeV3;
-import com.czertainly.api.model.client.attribute.ResponseAttribute;
-import com.czertainly.api.model.client.attribute.ResponseAttributeV2;
-import com.czertainly.api.model.client.attribute.ResponseAttributeV3;
-import com.czertainly.api.model.common.attribute.common.AttributeType;
-import com.czertainly.api.model.common.attribute.common.content.AttributeContentType;
-import com.czertainly.api.model.common.attribute.common.properties.CustomAttributeProperties;
-import com.czertainly.api.model.common.attribute.v2.content.StringAttributeContentV2;
-import com.czertainly.api.model.common.attribute.v3.CustomAttributeV3;
+import com.otilm.api.exception.AlreadyExistException;
+import com.otilm.api.exception.AttributeException;
+import com.otilm.api.exception.ConnectorException;
+import com.otilm.api.exception.NotFoundException;
+import com.otilm.api.exception.ValidationError;
+import com.otilm.api.exception.ValidationException;
+import com.otilm.api.model.client.signing.profile.SigningProfileRequestDto;
+import com.otilm.api.model.common.BulkActionMessageDto;
+import com.otilm.api.model.client.attribute.RequestAttribute;
+import com.otilm.api.model.client.attribute.RequestAttributeV2;
+import com.otilm.api.model.client.attribute.RequestAttributeV3;
+import com.otilm.api.model.client.attribute.ResponseAttribute;
+import com.otilm.api.model.client.attribute.ResponseAttributeV2;
+import com.otilm.api.model.client.attribute.ResponseAttributeV3;
+import com.otilm.api.model.common.attribute.common.AttributeType;
+import com.otilm.api.model.common.attribute.common.content.AttributeContentType;
+import com.otilm.api.model.common.attribute.common.properties.CustomAttributeProperties;
+import com.otilm.api.model.common.attribute.v2.content.StringAttributeContentV2;
+import com.otilm.api.model.common.attribute.v3.CustomAttributeV3;
 
 import static com.czertainly.core.util.builders.RequestAttributeV3Builder.aCustomAttribute;
 
-import com.czertainly.api.model.common.enums.cryptography.RsaSignatureScheme;
+import com.otilm.api.model.common.enums.cryptography.RsaSignatureScheme;
 import com.czertainly.core.attribute.RsaSignatureAttributes;
 import com.czertainly.core.attribute.engine.AttributeEngine;
 import com.czertainly.core.attribute.engine.AttributeOperation;
 import com.czertainly.core.attribute.engine.records.ObjectAttributeContentInfo;
-import com.czertainly.api.model.client.cryptography.key.KeyRequestType;
-import com.czertainly.api.model.client.signing.profile.SigningProfileDto;
-import com.czertainly.api.model.client.signing.profile.SigningProfileListDto;
-import com.czertainly.api.model.client.signing.profile.SimplifiedSigningProfileDto;
-import com.czertainly.api.model.client.signing.protocols.tsp.TspActivationDetailDto;
-import com.czertainly.api.model.client.signing.protocols.tsp.TspProfileDto;
-import com.czertainly.api.model.client.signing.profile.scheme.DelegatedSigningDto;
-import com.czertainly.api.model.client.signing.profile.scheme.SigningScheme;
-import com.czertainly.api.model.client.signing.profile.scheme.StaticKeyManagedSigningDto;
-import com.czertainly.api.model.client.signing.profile.workflow.ContentSigningWorkflowDto;
-import com.czertainly.api.model.client.signing.profile.workflow.RawSigningWorkflowDto;
-import com.czertainly.api.model.client.signing.profile.workflow.SigningWorkflowType;
-import com.czertainly.api.model.client.signing.profile.workflow.TimestampingWorkflowDto;
-import com.czertainly.api.model.common.PaginationResponseDto;
-import com.czertainly.api.model.common.enums.cryptography.DigestAlgorithm;
-import com.czertainly.api.model.common.enums.cryptography.KeyAlgorithm;
-import com.czertainly.api.model.core.auth.Resource;
-import com.czertainly.api.model.core.connector.v2.ConnectorDetailDto;
-import com.czertainly.api.model.core.cryptography.key.KeyDetailDto;
-import com.czertainly.api.model.core.cryptography.token.TokenInstanceDetailDto;
-import com.czertainly.api.model.core.cryptography.tokenprofile.TokenProfileDetailDto;
-import com.czertainly.api.model.core.signing.SigningProtocol;
+import com.otilm.api.model.client.cryptography.key.KeyRequestType;
+import com.otilm.api.model.client.signing.profile.SigningProfileDto;
+import com.otilm.api.model.client.signing.profile.SigningProfileListDto;
+import com.otilm.api.model.client.signing.profile.SimplifiedSigningProfileDto;
+import com.otilm.api.model.client.signing.protocols.tsp.TspActivationDetailDto;
+import com.otilm.api.model.client.signing.protocols.tsp.TspProfileDto;
+import com.otilm.api.model.client.signing.profile.scheme.DelegatedSigningDto;
+import com.otilm.api.model.client.signing.profile.scheme.SigningScheme;
+import com.otilm.api.model.client.signing.profile.scheme.StaticKeyManagedSigningDto;
+import com.otilm.api.model.client.signing.profile.workflow.ContentSigningWorkflowDto;
+import com.otilm.api.model.client.signing.profile.workflow.RawSigningWorkflowDto;
+import com.otilm.api.model.client.signing.profile.workflow.SigningWorkflowType;
+import com.otilm.api.model.client.signing.profile.workflow.TimestampingWorkflowDto;
+import com.otilm.api.model.common.PaginationResponseDto;
+import com.otilm.api.model.common.enums.cryptography.DigestAlgorithm;
+import com.otilm.api.model.common.enums.cryptography.KeyAlgorithm;
+import com.otilm.api.model.core.auth.Resource;
+import com.otilm.api.model.core.connector.v2.ConnectorDetailDto;
+import com.otilm.api.model.core.cryptography.key.KeyDetailDto;
+import com.otilm.api.model.core.cryptography.token.TokenInstanceDetailDto;
+import com.otilm.api.model.core.cryptography.tokenprofile.TokenProfileDetailDto;
+import com.otilm.api.model.core.signing.SigningProtocol;
 import com.czertainly.core.dao.entity.AttributeDefinition;
 import com.czertainly.core.dao.entity.AttributeRelation;
 import com.czertainly.core.dao.entity.Certificate;
-import com.czertainly.api.model.client.signing.timequality.TimeQualityConfigurationDto;
+import com.otilm.api.model.client.signing.timequality.TimeQualityConfigurationDto;
 import com.czertainly.core.model.signing.SigningProfileModel;
 import com.czertainly.core.model.signing.scheme.StaticKeyManagedSigning;
 import com.czertainly.core.model.signing.timequality.TimeQualityConfigurationModel;
@@ -63,7 +63,7 @@ import com.czertainly.core.dao.repository.AttributeRelationRepository;
 import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.helpers.CertificateGeneratorHelper;
 import com.czertainly.core.helpers.TestCertificateAuthority;
-import com.czertainly.core.model.auth.ResourceAction;
+import com.otilm.core.model.auth.ResourceAction;
 import com.czertainly.core.security.authz.SecuredParentUUID;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
@@ -438,7 +438,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             // given: signingCertificate from setUp (access allowed by default)
 
             // when
-            List<com.czertainly.api.model.common.attribute.common.BaseAttribute> attrs =
+            List<com.otilm.api.model.common.attribute.common.BaseAttribute> attrs =
                     signingProfileService.listSignatureAttributesForCertificate(defaultSigningCertificate.getUuid());
 
             // then

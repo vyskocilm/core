@@ -1,6 +1,6 @@
 package com.czertainly.core.security.authz;
 
-import com.czertainly.api.exception.ValidationException;
+import com.otilm.api.exception.ValidationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 

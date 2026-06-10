@@ -1,6 +1,6 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.connector.v2.ConnectorInfo;
+import com.otilm.api.model.client.connector.v2.ConnectorInfo;
 
 public class ConnectorInfoBuilder {
 

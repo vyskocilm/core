@@ -1,10 +1,10 @@
 package com.czertainly.core.helpers;
 
-import com.czertainly.api.exception.AlreadyExistException;
-import com.czertainly.api.exception.AttributeException;
-import com.czertainly.api.exception.CertificateOperationException;
-import com.czertainly.api.exception.NotFoundException;
-import com.czertainly.api.model.common.UuidDto;
+import com.otilm.api.exception.AlreadyExistException;
+import com.otilm.api.exception.AttributeException;
+import com.otilm.api.exception.CertificateOperationException;
+import com.otilm.api.exception.NotFoundException;
+import com.otilm.api.model.common.UuidDto;
 import com.czertainly.core.dao.entity.Certificate;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.service.CertificateService;

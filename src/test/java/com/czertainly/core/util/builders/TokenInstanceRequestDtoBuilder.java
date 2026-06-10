@@ -1,6 +1,6 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.cryptography.token.TokenInstanceRequestDto;
+import com.otilm.api.model.client.cryptography.token.TokenInstanceRequestDto;
 
 import java.util.List;
 

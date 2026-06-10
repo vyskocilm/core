@@ -1,6 +1,6 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.certificate.CertificateUpdateObjectsDto;
+import com.otilm.api.model.client.certificate.CertificateUpdateObjectsDto;
 
 import java.util.List;
 

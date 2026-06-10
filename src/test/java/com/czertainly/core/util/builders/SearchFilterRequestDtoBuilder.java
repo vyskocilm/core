@@ -1,7 +1,7 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.core.search.FilterConditionOperator;
-import com.czertainly.api.model.core.search.FilterFieldSource;
+import com.otilm.api.model.core.search.FilterConditionOperator;
+import com.otilm.api.model.core.search.FilterFieldSource;
 import com.czertainly.core.enums.FilterField;
 import com.czertainly.core.search.SearchFilterRequestDtoDummy;
 

@@ -1,7 +1,7 @@
 package com.czertainly.core.util.builders;
 
-import com.czertainly.api.model.client.attribute.RequestAttribute;
-import com.czertainly.api.model.client.cryptography.key.KeyRequestDto;
+import com.otilm.api.model.client.attribute.RequestAttribute;
+import com.otilm.api.model.client.cryptography.key.KeyRequestDto;
 
 import java.util.List;
 
