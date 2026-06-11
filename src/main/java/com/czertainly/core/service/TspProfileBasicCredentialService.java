@@ -27,4 +27,11 @@ public interface TspProfileBasicCredentialService {
      * credential. Invoked by the secret-content-updated event adapter, not by the HTTP API.
      */
     void evictCachesForSecret(UUID secretUuid);
+
+    /**
+     * Deletes the vault secret backing every Basic credential of the given TSP profile and evicts the
+     * corresponding credential-verification cache entries.
+     * Runs without an ambient transaction so the vault HTTP calls never hold a database transaction open.
+     */
+    void deleteSecretsForProfile(UUID tspProfileUuid);
 }

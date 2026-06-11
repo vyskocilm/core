@@ -36,6 +36,7 @@ import com.czertainly.core.security.authz.ExternalAuthorization;
 import com.czertainly.core.security.authz.SecuredUUID;
 import com.czertainly.core.security.authz.SecurityFilter;
 import com.czertainly.core.service.TspProfileService;
+import com.czertainly.core.service.TspProfileBasicCredentialService;
 import com.czertainly.core.service.SecretService;
 import com.czertainly.core.service.SigningProfileService;
 import com.czertainly.core.service.VaultProfileService;
@@ -74,6 +75,7 @@ public class TspProfileServiceImpl implements TspProfileService {
     private VaultProfileService vaultProfileService;
     private TspProfileRepository tspProfileRepository;
     private SecretService secretService;
+    private TspProfileBasicCredentialService basicCredentialService;
 
     @Override
     @ExternalAuthorization(resource = Resource.TSP_PROFILE, action = ResourceAction.LIST)
@@ -393,6 +395,7 @@ public class TspProfileServiceImpl implements TspProfileService {
         }
 
         String name = profile.getName();
+        basicCredentialService.deleteSecretsForProfile(profile.getUuid());
         attributeEngine.deleteObjectAttributeContent(Resource.TSP_PROFILE, profile.getUuid());
         tspProfileRepository.delete(profile);
         evictTspProfileCache(name);
@@ -447,6 +450,11 @@ public class TspProfileServiceImpl implements TspProfileService {
     @Autowired
     public void setSecretService(SecretService secretService) {
         this.secretService = secretService;
+    }
+
+    @Autowired
+    public void setBasicCredentialService(TspProfileBasicCredentialService basicCredentialService) {
+        this.basicCredentialService = basicCredentialService;
     }
 
     @Lazy
