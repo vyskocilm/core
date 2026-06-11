@@ -23,10 +23,13 @@ class TspProfileSecretEvictionListenerTest {
 
     @Test
     void delegatesEvictionToCredentialService() {
+        // given
         UUID secretUuid = UUID.randomUUID();
 
+        // when
         listener.onSecretContentUpdated(new SecretContentUpdatedEvent(secretUuid));
 
+        // then
         verify(credentialService).evictCachesForSecret(secretUuid);
     }
 }

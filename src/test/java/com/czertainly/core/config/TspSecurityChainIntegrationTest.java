@@ -5,11 +5,9 @@ import com.czertainly.core.util.BaseSpringBootTestNoAuth;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -26,8 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.io.IOException;
-
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -72,7 +69,7 @@ class TspSecurityChainIntegrationTest extends BaseSpringBootTestNoAuth {
     }
 
     @BeforeEach
-    void setUp() throws ServletException, IOException {
+    void resetCachesAndStubAuthService() throws Exception {
         authenticationCache.evictAll();
 
         Mockito.doAnswer(invocation -> {
@@ -91,6 +88,13 @@ class TspSecurityChainIntegrationTest extends BaseSpringBootTestNoAuth {
         addAuthPostStub(CERTIFICATE_HEADER_VALUE, certificateUserUuid, CERTIFICATE_USER_USERNAME);
         addAuthGetSub(certificateUserUuid, CERTIFICATE_USER_USERNAME);
     }
+
+    @AfterEach
+    void stopMockServer() {
+        mockServer.stop();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void addAuthPostStub(String requestBody, String userUuid, String username) {
         mockServer.stubFor(WireMock.post(WireMock.urlPathMatching("/auth"))
@@ -113,33 +117,34 @@ class TspSecurityChainIntegrationTest extends BaseSpringBootTestNoAuth {
         ));
     }
 
-    @AfterEach
-    void afterEach() {
-        mockServer.stop();
-    }
-
     private String path(String suffix) {
         return ServletUriComponentsBuilder.fromCurrentContextPath().build().getPath() + suffix;
     }
 
     @Test
-    void tspRequestWithoutCredentialsIsUnauthorized() throws Exception {
+    void returnsUnauthorized_whenTspRequestHasNoCredentials() throws Exception {
+        // when
         MvcResult result = mvc.perform(post(path("/v1/protocols/tsp/Unknown Profile/sign")))
                 .andExpect(status().isUnauthorized())
                 .andReturn();
 
-        // The JDBC session / cookie filter must not run for TSP requests: no session cookie is established.
-        Assertions.assertNull(result.getResponse().getCookie(CookieConfig.COOKIE_NAME),
-                "TSP chain must not set a session cookie");
+        // then — the JDBC session / cookie filter must not run for TSP requests: no session cookie is established
+        assertThat(result.getResponse().getCookie(CookieConfig.COOKIE_NAME))
+                .as("TSP chain must not set a session cookie")
+                .isNull();
     }
 
     @Test
-    void managementApiIsServedByCatchAllChain() throws Exception {
-        // The /v1/tspProfiles management endpoint is served by the @Order(2) chain. With a valid certificate header
-        // the catch-all chain authenticates the caller; the request must not be short-circuited by the TSP chain.
+    void servesManagementApiViaCatchAllChain() throws Exception {
+        // given — a valid certificate header so the @Order(2) catch-all chain authenticates the caller
+
+        // when — the /v1/tspProfiles management endpoint is served by the catch-all chain
         MvcResult result = mvc.perform(get(path("/v1/tspProfiles"))
                 .header("X-APP-CERTIFICATE", CERTIFICATE_HEADER_VALUE)).andReturn();
-        Assertions.assertNotEquals(401, result.getResponse().getStatus(),
-                "management API must not be rejected as unauthenticated by the catch-all chain");
+
+        // then — the request must not be short-circuited as unauthenticated by the TSP chain
+        assertThat(result.getResponse().getStatus())
+                .as("management API must not be rejected as unauthenticated by the catch-all chain")
+                .isNotEqualTo(401);
     }
 }

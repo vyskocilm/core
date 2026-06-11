@@ -15,6 +15,7 @@ import com.czertainly.core.service.TspProfileService;
 import com.czertainly.core.util.AuthHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -30,13 +31,15 @@ import org.slf4j.MDC;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TspAuthenticationFilterTest {
@@ -61,7 +64,7 @@ class TspAuthenticationFilterTest {
     private MockFilterChain chain;
 
     @BeforeEach
-    void setUp() {
+    void buildFilterAndClearContext() {
         TspSecurityContextWriter contextWriter = new TspSecurityContextWriter(authHelper);
         filter = new TspAuthenticationFilter(
                 new TspRouteResolver(tspProfileService, signingProfileService),
@@ -78,24 +81,26 @@ class TspAuthenticationFilterTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void clearContext() {
         SecurityContextHolder.clearContext();
         MDC.clear();
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     /** Asserts the audit actor MDC reflects the resolved principal (ActorType.USER), not the legacy {@code tsp} system user. */
-    private void assertActorIsPrincipal(String expectedUuid, String expectedUsername) {
-        assertEquals(ActorType.USER.name(), MDC.get("log_actor_type"));
-        assertEquals(expectedUuid, MDC.get("log_actor_uuid"));
-        assertEquals(expectedUsername, MDC.get("log_actor_name"));
+    private static void assertActorIsPrincipal(String expectedUuid, String expectedUsername) {
+        assertThat(MDC.get("log_actor_type")).isEqualTo(ActorType.USER.name());
+        assertThat(MDC.get("log_actor_uuid")).isEqualTo(expectedUuid);
+        assertThat(MDC.get("log_actor_name")).isEqualTo(expectedUsername);
     }
 
-    private TspProfileModel modelWith(List<TspAuthenticationMethod> methods) {
+    private static TspProfileModel modelWith(List<TspAuthenticationMethod> methods) {
         return new TspProfileModel(UUID.randomUUID(), "p1", null, true, null, null, List.of(), methods, List.of(), null);
     }
 
-    private TspProfileModel modelWith(List<TspAuthenticationMethod> methods, UUID vaultProfileUuid,
-                                      List<TspProfileModel.BasicCredentialRef> credentials) {
+    private static TspProfileModel modelWith(List<TspAuthenticationMethod> methods, UUID vaultProfileUuid,
+                                             List<TspProfileModel.BasicCredentialRef> credentials) {
         return new TspProfileModel(UUID.randomUUID(), "p1", null, true, null, null, List.of(), methods, credentials, vaultProfileUuid);
     }
 
@@ -126,415 +131,478 @@ class TspAuthenticationFilterTest {
                 List.of(new SimpleGrantedAuthority("ROLE_USER")), "{\"user\":{\"uuid\":\"uuid-1\",\"username\":\"alice\"}}");
     }
 
-    // ---------------------------------------------------------------------
-    // Gate / route resolution
-    // ---------------------------------------------------------------------
+    // ── RouteResolution ───────────────────────────────────────────────────────
 
-    @Test
-    void disallowedMethod_certOnlyProfile_returns401WithoutChallenge() throws Exception {
-        // A client-certificate-only profile has no HTTP-level scheme to advertise: the cert is presented to the
-        // TLS-terminating proxy, not via a WWW-Authenticate challenge. The response is 401 with the header omitted.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
-        request.addHeader("Authorization", basicHeader("u", "p"));
+    @Nested
+    class RouteResolution {
 
-        filter.doFilter(request, response, chain);
+        @Test
+        void returns401WithoutChallenge_whenMethodDisallowed_certOnlyProfile() throws Exception {
+            // given — a client-certificate-only profile has no HTTP-level scheme to advertise: the cert is presented
+            // to the TLS-terminating proxy, not via a WWW-Authenticate challenge. The response is 401, header omitted.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
+            request.addHeader("Authorization", basicHeader("u", "p"));
 
-        assertEquals(401, response.getStatus());
-        assertNull(response.getHeader("WWW-Authenticate"));
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(response.getHeader("WWW-Authenticate")).isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        void rejectsBeforeAuth_whenSigningProfileRouteHasNullTspProfileUuid() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/signingProfiles/sp1/sign");
+            when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1"))
+                    .thenReturn(Optional.empty());
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(response.getHeader("WWW-Authenticate")).isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        void resolvesLinkedTspProfile_onSigningProfileRoute() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/signingProfiles/sp1/sign");
+            when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1"))
+                    .thenReturn(Optional.of(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE))));
+            request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
+            when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT)).thenReturn(authenticatedInfo());
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+            assertThat(chain.getRequest()).isNotNull();
+        }
+
+        @Test
+        void resolvesAsDirectTspProfile_whenDirectNameLooksLikeSigningProfiles() throws Exception {
+            // given — a single-segment direct name that happens to be "signingProfiles" must NOT be routed through the
+            // indirect signing-profile resolution: there is no trailing name segment, so it is a plain direct name.
+            setPath("/v1/protocols/tsp/signingProfiles/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("signingProfiles"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
+            request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
+            when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT)).thenReturn(authenticatedInfo());
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            verify(tspProfileService).resolveTspProfileForAuthentication("signingProfiles");
+            verifyNoInteractions(signingProfileService);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+            assertThat(chain.getRequest()).isNotNull();
+        }
+
+        @Test
+        void returns401WithoutAuthentication_whenDirectRouteNotFound() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenThrow(new NotFoundException("TspProfile", "p1"));
+            request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+            verifyNoInteractions(authClient);
+        }
+
+        @Test
+        void advertisesBearerNotBasic_whenBearerOnlyProfile_andMethodDisallowed() throws Exception {
+            // given — present Basic, which is NOT in the allowed set → 401, header must advertise Bearer (not Basic)
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
+            request.addHeader("Authorization", basicHeader("u", "p"));
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            String header = response.getHeader("WWW-Authenticate");
+            assertThat(header).isNotNull();
+            assertThat(header).contains("Bearer");
+            assertThat(header).doesNotContain("Basic");
+            assertThat(chain.getRequest()).isNull();
+        }
     }
 
-    @Test
-    void nullTspProfileUuidOnSigningProfileRoute_rejectsBeforeAuth() throws Exception {
-        setPath("/v1/protocols/tsp/signingProfiles/sp1/sign");
-        when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1"))
-                .thenReturn(Optional.empty());
+    // ── PathAnchoring ─────────────────────────────────────────────────────────
 
-        filter.doFilter(request, response, chain);
+    @Nested
+    class PathAnchoring {
 
-        assertEquals(401, response.getStatus());
-        assertNull(response.getHeader("WWW-Authenticate"));
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
+        @Test
+        void isNotGated_whenMultiSegmentTspPath() throws Exception {
+            // given — a multi-segment name between the prefix and /sign must not be treated as a single profile name,
+            // nor confused with the indirect signingProfiles route.
+            setPath("/v1/protocols/tsp/a/b/sign");
+
+            // when / then
+            assertThat(filter.shouldNotFilter(request)).isTrue();
+
+            filter.doFilter(request, response, chain);
+
+            verifyNoInteractions(tspProfileService, signingProfileService);
+            assertThat(response.getStatus()).isNotEqualTo(401);
+            assertThat(chain.getRequest()).isNotNull();
+        }
+
+        @Test
+        void isNotGated_whenTrailingSlashTspPath() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/p1/sign/");
+
+            // when / then
+            assertThat(filter.shouldNotFilter(request)).isTrue();
+
+            filter.doFilter(request, response, chain);
+
+            verifyNoInteractions(tspProfileService, signingProfileService);
+            assertThat(response.getStatus()).isNotEqualTo(401);
+            assertThat(chain.getRequest()).isNotNull();
+        }
+
+        @Test
+        void isNotGated_whenNonSignTspPath() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/p1/verify");
+
+            // when / then
+            assertThat(filter.shouldNotFilter(request)).isTrue();
+
+            filter.doFilter(request, response, chain);
+
+            verifyNoInteractions(tspProfileService, signingProfileService);
+            assertThat(chain.getRequest()).isNotNull();
+        }
     }
 
-    @Test
-    void signingProfileRoute_resolvesLinkedTspProfile() throws Exception {
-        setPath("/v1/protocols/tsp/signingProfiles/sp1/sign");
-        when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1"))
-                .thenReturn(Optional.of(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE))));
-        request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
-        when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT)).thenReturn(authenticatedInfo());
+    // ── ClientCertificate ─────────────────────────────────────────────────────
 
-        filter.doFilter(request, response, chain);
+    @Nested
+    class ClientCertificate {
 
-        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNotNull(chain.getRequest());
+        @Test
+        void setsContextFromConnector() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
+            request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
+            when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT)).thenReturn(authenticatedInfo());
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            verify(authClient).authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+            assertThat(chain.getRequest()).isNotNull();
+            assertActorIsPrincipal("uuid-1", "alice");
+        }
     }
 
-    // ---------------------------------------------------------------------
-    // Path confusion / route anchoring
-    // ---------------------------------------------------------------------
+    // ── BearerToken ───────────────────────────────────────────────────────────
 
-    @Test
-    void multiSegmentTspPath_isNotGatedByFilter() throws Exception {
-        // A multi-segment name between the prefix and /sign must not be treated as a single profile name,
-        // nor confused with the indirect signingProfiles route.
-        setPath("/v1/protocols/tsp/a/b/sign");
+    @Nested
+    class BearerToken {
 
-        assertTrue(filter.shouldNotFilter(request));
+        @Test
+        void decodesAndAuthenticatesByToken() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
+            request.addHeader("Authorization", "Bearer the.jwt.token");
+            Jwt jwt = Jwt.withTokenValue("the.jwt.token")
+                    .header("alg", "none")
+                    .claim("sub", "alice")
+                    .claim("jti", "jti-1")
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(60))
+                    .build();
+            when(jwtDecoder.decode("the.jwt.token")).thenReturn(jwt);
+            when(authClient.authenticateByToken(any())).thenReturn(authenticatedInfo());
 
-        filter.doFilter(request, response, chain);
+            // when
+            filter.doFilter(request, response, chain);
 
-        verifyNoInteractions(tspProfileService, signingProfileService);
-        assertNotEquals(401, response.getStatus());
-        assertNotNull(chain.getRequest());
+            // then
+            verify(jwtDecoder).decode("the.jwt.token");
+            verify(authClient).authenticateByToken(any());
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+            assertThat(chain.getRequest()).isNotNull();
+            assertActorIsPrincipal("uuid-1", "alice");
+        }
     }
 
-    @Test
-    void trailingSlashTspPath_isNotGatedByFilter() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign/");
+    // ── BasicPassword ─────────────────────────────────────────────────────────
 
-        assertTrue(filter.shouldNotFilter(request));
+    @Nested
+    class BasicPassword {
 
-        filter.doFilter(request, response, chain);
+        @Test
+        void authenticatesAsMappedUser_whenFingerprintMatches() throws Exception {
+            // given
+            UUID secretUuid = UUID.randomUUID();
+            UUID mappedUser = UUID.randomUUID();
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
+                    List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
+                    List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, fingerprintOf("alice", "s3cret")))));
+            request.addHeader("Authorization", basicHeader("alice", "s3cret"));
+            when(credentialCache.getMappedUser(secretUuid, "s3cret")).thenReturn(Optional.empty());
 
-        verifyNoInteractions(tspProfileService, signingProfileService);
-        assertNotEquals(401, response.getStatus());
-        assertNotNull(chain.getRequest());
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            verify(credentialCache).putSuccess(secretUuid, "s3cret", mappedUser);
+            verify(authHelper).authenticateAsUser(mappedUser);
+            assertThat(chain.getRequest()).isNotNull();
+        }
+
+        @Test
+        void returns401_whenFingerprintMismatch() throws Exception {
+            // given
+            UUID secretUuid = UUID.randomUUID();
+            UUID mappedUser = UUID.randomUUID();
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
+                    List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
+                    List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, fingerprintOf("alice", "right")))));
+            request.addHeader("Authorization", basicHeader("alice", "wrong"));
+            when(credentialCache.getMappedUser(secretUuid, "wrong")).thenReturn(Optional.empty());
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            verify(credentialCache, never()).putSuccess(any(), any(), any());
+            verify(authHelper, never()).authenticateAsUser(any());
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        void skipsFingerprintCheck_onCacheHit() throws Exception {
+            // given
+            UUID secretUuid = UUID.randomUUID();
+            UUID mappedUser = UUID.randomUUID();
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
+                    List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
+                    List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, "x"))));
+            request.addHeader("Authorization", basicHeader("alice", "s3cret"));
+            when(credentialCache.getMappedUser(secretUuid, "s3cret")).thenReturn(Optional.of(mappedUser));
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            verify(credentialCache, never()).putSuccess(any(), any(), any());
+            verify(authHelper).authenticateAsUser(mappedUser);
+            assertThat(chain.getRequest()).isNotNull();
+        }
+
+        @Test
+        void returns401WithoutForwarding_whenPasswordBlank() throws Exception {
+            // given
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD)));
+            request.addHeader("Authorization", basicHeader("alice", ""));
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            verify(authHelper, never()).authenticateAsUser(any());
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        void returns401_whenUsernameUnknown() throws Exception {
+            // given
+            UUID secretUuid = UUID.randomUUID();
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
+                    List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
+                    List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, UUID.randomUUID(), "x"))));
+            request.addHeader("Authorization", basicHeader("mallory", "s3cret"));
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            verify(authHelper, never()).authenticateAsUser(any());
+            assertThat(chain.getRequest()).isNull();
+        }
+
+        @Test
+        void advertisesBasicRealm_whenBasicMethodEnabled() throws Exception {
+            // given — present a Bearer token, which is NOT in the allowed set → 401, header must advertise Basic realm
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD)));
+            request.addHeader("Authorization", "Bearer some.jwt");
+
+            // when
+            filter.doFilter(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            String header = response.getHeader("WWW-Authenticate");
+            assertThat(header).isNotNull();
+            assertThat(header).contains("Basic realm=\"p1\"");
+        }
     }
 
-    @Test
-    void nonSignTspPath_isNotGatedByFilter() throws Exception {
-        setPath("/v1/protocols/tsp/p1/verify");
+    // ── FailClosed ────────────────────────────────────────────────────────────
 
-        assertTrue(filter.shouldNotFilter(request));
+    @Nested
+    class FailClosed {
 
-        filter.doFilter(request, response, chain);
+        @Test
+        void failsClosed_whenClientCertificateAuthClientThrows() throws Exception {
+            // given — CLIENT_CERTIFICATE profile, cert header present, but authenticateByCertificate throws.
+            // The filter must catch it, return 401, and NOT continue the chain.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
+            request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
+            when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT))
+                    .thenThrow(new CzertainlyAuthenticationException("upstream auth failure"));
 
-        verifyNoInteractions(tspProfileService, signingProfileService);
-        assertNotNull(chain.getRequest());
-    }
+            // when
+            filter.doFilter(request, response, chain);
 
-    @Test
-    void directNameLookingLikeSigningProfiles_resolvesAsDirectTspProfile() throws Exception {
-        // A single-segment direct name that happens to be "signingProfiles" must NOT be routed through the
-        // indirect signing-profile resolution: there is no trailing name segment, so it is a plain direct name.
-        setPath("/v1/protocols/tsp/signingProfiles/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("signingProfiles"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
-        request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
-        when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT)).thenReturn(authenticatedInfo());
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+        }
 
-        filter.doFilter(request, response, chain);
+        @Test
+        void failsClosed_whenCertHeaderMalformed() throws Exception {
+            // given — CLIENT_CERTIFICATE profile, but the cert header contains non-base64 content outside the PEM
+            // wrapper, causing Base64.getDecoder().decode to throw IllegalArgumentException. The filter must fail closed.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
+            request.addHeader(CERT_HEADER_NAME, "!!not-valid-base64!!");
 
-        verify(tspProfileService).resolveTspProfileForAuthentication("signingProfiles");
-        verifyNoInteractions(signingProfileService);
-        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNotNull(chain.getRequest());
-    }
+            // when
+            filter.doFilter(request, response, chain);
 
-    @Test
-    void directRouteNotFound_returns401WithoutAuthentication() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenThrow(new NotFoundException("TspProfile", "p1"));
-        request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+        }
 
-        filter.doFilter(request, response, chain);
+        @Test
+        void failsClosed_whenBearerDecodeReturnsNull() throws Exception {
+            // given — BEARER_TOKEN profile, jwtDecoder.decode returns null → filter must return 401, not continue chain.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
+            request.addHeader("Authorization", "Bearer the.jwt.token");
+            when(jwtDecoder.decode("the.jwt.token")).thenReturn(null);
 
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-        verifyNoInteractions(authClient);
-    }
+            // when
+            filter.doFilter(request, response, chain);
 
-    @Test
-    void bearerOnlyProfile_disallowedMethod_advertisesBearerNotBasic() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
-        // present Basic, which is NOT in the allowed set -> 401, header must advertise Bearer (not Basic)
-        request.addHeader("Authorization", basicHeader("u", "p"));
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+            verify(authClient, never()).authenticateByToken(any());
+        }
 
-        filter.doFilter(request, response, chain);
+        @Test
+        void failsClosed_whenBearerDecodeThrows() throws Exception {
+            // given — BEARER_TOKEN profile, jwtDecoder.decode throws a RuntimeException → filter must catch and 401.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
+            request.addHeader("Authorization", "Bearer bad.token");
+            when(jwtDecoder.decode("bad.token"))
+                    .thenThrow(new CzertainlyAuthenticationException("token decode failed"));
 
-        assertEquals(401, response.getStatus());
-        String header = response.getHeader("WWW-Authenticate");
-        assertNotNull(header);
-        assertTrue(header.contains("Bearer"), "expected Bearer challenge in: " + header);
-        assertFalse(header.contains("Basic"), "did not expect Basic challenge in: " + header);
-        assertNull(chain.getRequest());
-    }
+            // when
+            filter.doFilter(request, response, chain);
 
-    // ---------------------------------------------------------------------
-    // CLIENT_CERTIFICATE
-    // ---------------------------------------------------------------------
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+            verify(authClient, never()).authenticateByToken(any());
+        }
 
-    @Test
-    void clientCertificate_setsContextFromConnector() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
-        request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
-        when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT)).thenReturn(authenticatedInfo());
+        @Test
+        void failsClosedWithoutCallingConnector_whenBasicCredentialsHaveNoColon() throws Exception {
+            // given — BASIC_PASSWORD profile, Authorization is "Basic <base64 of a string with no colon>".
+            // decodeBasicCredentials returns null → filter must return 401 without ever consulting secretService.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
+                            List.of(new TspProfileModel.BasicCredentialRef("alice", UUID.randomUUID(), UUID.randomUUID(), "x"))));
+            String noColon = Base64.getEncoder().encodeToString("nocredentials".getBytes());
+            request.addHeader("Authorization", "Basic " + noColon);
 
-        filter.doFilter(request, response, chain);
+            // when
+            filter.doFilter(request, response, chain);
 
-        verify(authClient).authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT);
-        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNotNull(chain.getRequest());
-        assertActorIsPrincipal("uuid-1", "alice");
-    }
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+            verify(authHelper, never()).authenticateAsUser(any());
+        }
 
-    // ---------------------------------------------------------------------
-    // BEARER_TOKEN
-    // ---------------------------------------------------------------------
+        @Test
+        void failsClosedWithoutCallingConnector_whenBasicInvalidBase64() throws Exception {
+            // given — BASIC_PASSWORD profile, Authorization contains invalid Base64 — decodeBasicCredentials catches
+            // IllegalArgumentException and returns null → filter must return 401 without consulting secretService.
+            setPath("/v1/protocols/tsp/p1/sign");
+            when(tspProfileService.resolveTspProfileForAuthentication("p1"))
+                    .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
+                            List.of(new TspProfileModel.BasicCredentialRef("alice", UUID.randomUUID(), UUID.randomUUID(), "x"))));
+            request.addHeader("Authorization", "Basic !!!not-base64!!!");
 
-    @Test
-    void bearerToken_decodesAndAuthenticatesByToken() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
-        request.addHeader("Authorization", "Bearer the.jwt.token");
-        Jwt jwt = Jwt.withTokenValue("the.jwt.token")
-                .header("alg", "none")
-                .claim("sub", "alice")
-                .claim("jti", "jti-1")
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(60))
-                .build();
-        when(jwtDecoder.decode("the.jwt.token")).thenReturn(jwt);
-        when(authClient.authenticateByToken(any())).thenReturn(authenticatedInfo());
+            // when
+            filter.doFilter(request, response, chain);
 
-        filter.doFilter(request, response, chain);
-
-        verify(jwtDecoder).decode("the.jwt.token");
-        verify(authClient).authenticateByToken(any());
-        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNotNull(chain.getRequest());
-        assertActorIsPrincipal("uuid-1", "alice");
-    }
-
-    // ---------------------------------------------------------------------
-    // BASIC_PASSWORD
-    // ---------------------------------------------------------------------
-
-    @Test
-    void basicPassword_fingerprintMatch_authenticatesAsMappedUser() throws Exception {
-        UUID secretUuid = UUID.randomUUID();
-        UUID mappedUser = UUID.randomUUID();
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
-                List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
-                List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, fingerprintOf("alice", "s3cret")))));
-        request.addHeader("Authorization", basicHeader("alice", "s3cret"));
-        when(credentialCache.getMappedUser(secretUuid, "s3cret")).thenReturn(Optional.empty());
-
-        filter.doFilter(request, response, chain);
-
-        verify(credentialCache).putSuccess(secretUuid, "s3cret", mappedUser);
-        verify(authHelper).authenticateAsUser(mappedUser);
-        assertNotNull(chain.getRequest());
-    }
-
-    @Test
-    void basicPassword_fingerprintMismatch_returns401() throws Exception {
-        UUID secretUuid = UUID.randomUUID();
-        UUID mappedUser = UUID.randomUUID();
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
-                List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
-                List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, fingerprintOf("alice", "right")))));
-        request.addHeader("Authorization", basicHeader("alice", "wrong"));
-        when(credentialCache.getMappedUser(secretUuid, "wrong")).thenReturn(Optional.empty());
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        verify(credentialCache, never()).putSuccess(any(), any(), any());
-        verify(authHelper, never()).authenticateAsUser(any());
-        assertNull(chain.getRequest());
-    }
-
-    @Test
-    void basicPassword_cacheHit_skipsFingerprintCheck() throws Exception {
-        UUID secretUuid = UUID.randomUUID();
-        UUID mappedUser = UUID.randomUUID();
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
-                List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
-                List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, "x"))));
-        request.addHeader("Authorization", basicHeader("alice", "s3cret"));
-        when(credentialCache.getMappedUser(secretUuid, "s3cret")).thenReturn(Optional.of(mappedUser));
-
-        filter.doFilter(request, response, chain);
-
-        verify(credentialCache, never()).putSuccess(any(), any(), any());
-        verify(authHelper).authenticateAsUser(mappedUser);
-        assertNotNull(chain.getRequest());
-    }
-
-    @Test
-    void basicPassword_blankPassword_returns401WithoutForwarding() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD)));
-        request.addHeader("Authorization", basicHeader("alice", ""));
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        verify(authHelper, never()).authenticateAsUser(any());
-        assertNull(chain.getRequest());
-    }
-
-    @Test
-    void basicPassword_unknownUsername_returns401() throws Exception {
-        UUID secretUuid = UUID.randomUUID();
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
-                List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
-                List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, UUID.randomUUID(), "x"))));
-        request.addHeader("Authorization", basicHeader("mallory", "s3cret"));
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        verify(authHelper, never()).authenticateAsUser(any());
-        assertNull(chain.getRequest());
-    }
-
-    @Test
-    void basicMethodEnabled_wwwAuthenticateAdvertisesBasicRealm() throws Exception {
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD)));
-        // present a Bearer token, which is NOT in the allowed set -> 401, header must advertise Basic realm
-        request.addHeader("Authorization", "Bearer some.jwt");
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        String header = response.getHeader("WWW-Authenticate");
-        assertNotNull(header);
-        assertTrue(header.contains("Basic realm=\"p1\""), "expected Basic realm in: " + header);
-    }
-
-    // ---------------------------------------------------------------------
-    // Fail-closed: malformed / hostile input
-    // ---------------------------------------------------------------------
-
-    @Test
-    void clientCertificate_authClientThrows_failsClosed() throws Exception {
-        // CLIENT_CERTIFICATE profile, cert header present, but authenticateByCertificate throws a RuntimeException.
-        // The filter must catch it, return 401, and NOT continue the chain.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
-        request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
-        when(authClient.authenticateByCertificate(CERT_HEADER, CERT_THUMBPRINT))
-                .thenThrow(new CzertainlyAuthenticationException("upstream auth failure"));
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-    }
-
-    @Test
-    void clientCertificate_malformedCertHeader_failsClosed() throws Exception {
-        // CLIENT_CERTIFICATE profile, but the cert header contains non-base64 content outside the PEM wrapper,
-        // causing Base64.getDecoder().decode to throw IllegalArgumentException (a RuntimeException).
-        // The filter must catch it and fail closed.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
-        // "!!not-valid-base64!!" is not decodable — CertificateUtil.normalizeCertificateContent strips the garbage,
-        // and Base64 decoding of "!!not-valid-base64!!" (after stripping PEM headers) will throw.
-        request.addHeader(CERT_HEADER_NAME, "!!not-valid-base64!!");
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-    }
-
-    @Test
-    void bearerToken_decodeReturnsNull_failsClosed() throws Exception {
-        // BEARER_TOKEN profile, jwtDecoder.decode returns null → filter must return 401, not continue chain.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
-        request.addHeader("Authorization", "Bearer the.jwt.token");
-        when(jwtDecoder.decode("the.jwt.token")).thenReturn(null);
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-        verify(authClient, never()).authenticateByToken(any());
-    }
-
-    @Test
-    void bearerToken_decodeThrows_failsClosed() throws Exception {
-        // BEARER_TOKEN profile, jwtDecoder.decode throws a RuntimeException → filter must catch it and return 401.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
-        request.addHeader("Authorization", "Bearer bad.token");
-        when(jwtDecoder.decode("bad.token"))
-                .thenThrow(new CzertainlyAuthenticationException("token decode failed"));
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-        verify(authClient, never()).authenticateByToken(any());
-    }
-
-    @Test
-    void basicPassword_noColonInCredentials_failsClosedWithoutCallingConnector() throws Exception {
-        // BASIC_PASSWORD profile, Authorization header is "Basic <base64 of a string with no colon>".
-        // decodeBasicCredentials returns null → filter must return 401 without ever consulting secretService.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
-                        List.of(new TspProfileModel.BasicCredentialRef("alice", UUID.randomUUID(), UUID.randomUUID(), "x"))));
-        // Base64 of "nocredentials" — no colon separator, so decodeBasicCredentials returns null
-        String noColon = Base64.getEncoder().encodeToString("nocredentials".getBytes());
-        request.addHeader("Authorization", "Basic " + noColon);
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-        verify(authHelper, never()).authenticateAsUser(any());
-    }
-
-    @Test
-    void basicPassword_invalidBase64_failsClosedWithoutCallingConnector() throws Exception {
-        // BASIC_PASSWORD profile, Authorization header contains invalid Base64 — decodeBasicCredentials catches
-        // IllegalArgumentException and returns null → filter must return 401 without consulting secretService.
-        setPath("/v1/protocols/tsp/p1/sign");
-        when(tspProfileService.resolveTspProfileForAuthentication("p1"))
-                .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
-                        List.of(new TspProfileModel.BasicCredentialRef("alice", UUID.randomUUID(), UUID.randomUUID(), "x"))));
-        request.addHeader("Authorization", "Basic !!!not-base64!!!");
-
-        filter.doFilter(request, response, chain);
-
-        assertEquals(401, response.getStatus());
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-        assertNull(chain.getRequest());
-        verify(authHelper, never()).authenticateAsUser(any());
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(chain.getRequest()).isNull();
+            verify(authHelper, never()).authenticateAsUser(any());
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.czertainly.core.security.authn.client.AuthenticationInfo;
 import com.czertainly.core.util.AuthHelper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,10 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,50 +28,70 @@ class TspSecurityContextWriterTest {
     private TspSecurityContextWriter writer;
 
     @BeforeEach
-    void setUp() {
+    void createWriterAndClearContext() {
         writer = new TspSecurityContextWriter(authHelper);
         SecurityContextHolder.clearContext();
     }
 
     @AfterEach
-    void tearDown() {
+    void clearContext() {
         SecurityContextHolder.clearContext();
     }
 
-    @Test
-    void setFromAuthInfo_nullInfo_returnsFalseAndLeavesContextEmpty() {
-        assertFalse(writer.setFromAuthInfo(null));
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    // ── SetFromAuthInfo ───────────────────────────────────────────────────────
+
+    @Nested
+    class SetFromAuthInfo {
+
+        @Test
+        void returnsFalseAndLeavesContextEmpty_whenInfoNull() {
+            // when / then
+            assertThat(writer.setFromAuthInfo(null)).isFalse();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        @Test
+        void returnsFalseAndLeavesContextEmpty_whenInfoAnonymous() {
+            // when / then
+            assertThat(writer.setFromAuthInfo(AuthenticationInfo.getAnonymousAuthenticationInfo())).isFalse();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        @Test
+        void populatesContext_whenInfoValid() {
+            // given
+            AuthenticationInfo info = new AuthenticationInfo(AuthMethod.CERTIFICATE, "uuid-1", "alice",
+                    List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+            // when / then
+            assertThat(writer.setFromAuthInfo(info)).isTrue();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+        }
     }
 
-    @Test
-    void setFromAuthInfo_anonymousInfo_returnsFalseAndLeavesContextEmpty() {
-        assertFalse(writer.setFromAuthInfo(AuthenticationInfo.getAnonymousAuthenticationInfo()));
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-    }
+    // ── AuthenticateAsUser ────────────────────────────────────────────────────
 
-    @Test
-    void setFromAuthInfo_validInfo_populatesContext() {
-        AuthenticationInfo info = new AuthenticationInfo(AuthMethod.CERTIFICATE, "uuid-1", "alice",
-                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    @Nested
+    class AuthenticateAsUser {
 
-        assertTrue(writer.setFromAuthInfo(info));
-        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
-    }
+        @Test
+        void returnsFalseAndClearsContext_whenProxyFails() {
+            // given
+            UUID userUuid = UUID.randomUUID();
+            doThrow(new RuntimeException("auth service down")).when(authHelper).authenticateAsUser(userUuid);
 
-    @Test
-    void authenticateAsUser_proxyFails_returnsFalseAndClearsContext() {
-        UUID userUuid = UUID.randomUUID();
-        doThrow(new RuntimeException("auth service down")).when(authHelper).authenticateAsUser(userUuid);
+            // when / then
+            assertThat(writer.authenticateAsUser(userUuid)).isFalse();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
 
-        assertFalse(writer.authenticateAsUser(userUuid));
-        assertNull(SecurityContextHolder.getContext().getAuthentication());
-    }
+        @Test
+        void returnsTrue_whenProxySucceeds() {
+            // given
+            UUID userUuid = UUID.randomUUID();
 
-    @Test
-    void authenticateAsUser_proxySucceeds_returnsTrue() {
-        UUID userUuid = UUID.randomUUID();
-
-        assertTrue(writer.authenticateAsUser(userUuid));
+            // when / then
+            assertThat(writer.authenticateAsUser(userUuid)).isTrue();
+        }
     }
 }
