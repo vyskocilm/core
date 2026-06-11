@@ -1,8 +1,6 @@
 package com.otilm.core.dao.entity;
 
 import com.otilm.api.model.common.attribute.common.BaseAttribute;
-import com.otilm.api.model.common.attribute.v2.BaseAttributeV2;
-import com.otilm.api.model.common.attribute.v2.DataAttributeV2;
 import com.otilm.core.util.AttributeDefinitionUtils;
 import jakarta.persistence.*;
 import lombok.*;

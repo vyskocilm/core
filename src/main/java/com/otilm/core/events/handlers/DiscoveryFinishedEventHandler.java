@@ -9,7 +9,6 @@ import com.otilm.core.dao.entity.DiscoveryHistory;
 import com.otilm.core.dao.repository.DiscoveryRepository;
 import com.otilm.core.evaluator.TriggerEvaluator;
 import com.otilm.core.events.EventContext;
-import com.otilm.core.events.EventContextTriggers;
 import com.otilm.core.events.EventHandler;
 import com.otilm.core.events.data.DiscoveryResult;
 import com.otilm.core.events.data.EventDataBuilder;

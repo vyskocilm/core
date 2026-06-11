@@ -1,13 +1,11 @@
 package com.otilm.core.dao.entity.workflows;
 
-import com.otilm.api.model.common.attribute.v2.content.BaseAttributeContentV2;
 import com.otilm.api.model.common.attribute.v3.content.BaseAttributeContentV3;
 import com.otilm.api.model.core.search.FilterFieldSource;
 import com.otilm.api.model.core.workflows.ExecutionItemDto;
 import com.otilm.core.dao.converter.ObjectToJsonConverter;
 import com.otilm.core.dao.entity.UniquelyIdentified;
 import com.otilm.core.dao.entity.notifications.NotificationProfile;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

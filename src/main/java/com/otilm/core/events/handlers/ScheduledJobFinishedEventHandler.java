@@ -1,6 +1,5 @@
 package com.otilm.core.events.handlers;
 
-import com.otilm.api.exception.EventException;
 import com.otilm.api.model.common.events.data.ScheduledJobFinishedEventData;
 import com.otilm.api.model.core.auth.Resource;
 import com.otilm.api.model.core.other.ResourceEvent;
@@ -8,7 +7,6 @@ import com.otilm.core.dao.entity.ScheduledJob;
 import com.otilm.core.dao.repository.ScheduledJobsRepository;
 import com.otilm.core.evaluator.TriggerEvaluator;
 import com.otilm.core.events.EventContext;
-import com.otilm.core.events.EventContextTriggers;
 import com.otilm.core.events.EventHandler;
 import com.otilm.core.messaging.model.EventMessage;
 import com.otilm.core.messaging.model.NotificationMessage;
