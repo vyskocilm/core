@@ -65,7 +65,7 @@ public class AuthHelper {
 
     private OpaClient opaClient;
     private UserManagementApiClient userManagementApiClient;
-    private PlatformAuthenticationClient czertainlyAuthenticationClient;
+    private PlatformAuthenticationClient authenticationClient;
 
     private static final Set<String> protocolUsers = Set.of(ACME_USERNAME, SCEP_USERNAME, CMP_USERNAME);
 
@@ -80,8 +80,8 @@ public class AuthHelper {
     }
 
     @Autowired
-    public void setPlatformAuthenticationClient(PlatformAuthenticationClient czertainlyAuthenticationClient) {
-        this.czertainlyAuthenticationClient = czertainlyAuthenticationClient;
+    public void setPlatformAuthenticationClient(PlatformAuthenticationClient authenticationClient) {
+        this.authenticationClient = authenticationClient;
     }
 
     public void authenticateAsSystemUser(String username) {
@@ -89,7 +89,7 @@ public class AuthHelper {
         ActorType actorType = protocolUsers.contains(username) ? ActorType.PROTOCOL : ActorType.CORE;
         LoggingHelper.putActorInfoWhenNull(actorType, null, username);
 
-        AuthenticationInfo authUserInfo = czertainlyAuthenticationClient.authenticateSystemUser(username);
+        AuthenticationInfo authUserInfo = authenticationClient.authenticateSystemUser(username);
         PlatformUserDetails userDetails = new PlatformUserDetails(authUserInfo);
         SecurityContext securityContext = SecurityContextHolder.getContext();
         securityContext.setAuthentication(new PlatformAuthenticationToken(userDetails));
@@ -100,7 +100,7 @@ public class AuthHelper {
         // update MDC for actor logging
         LoggingHelper.putActorInfoWhenNull(ActorType.USER, userUuid.toString(), null);
 
-        AuthenticationInfo authUserInfo = czertainlyAuthenticationClient.authenticateByUserUuid(userUuid);
+        AuthenticationInfo authUserInfo = authenticationClient.authenticateByUserUuid(userUuid);
         SecurityContext securityContext = SecurityContextHolder.getContext();
         securityContext.setAuthentication(new PlatformAuthenticationToken(new PlatformUserDetails(authUserInfo)));
         logger.debug("User with username '{}' has been successfully authenticated as user proxy.", authUserInfo.getUsername());
@@ -159,14 +159,14 @@ public class AuthHelper {
 
     public SecurityResourceFilter loadObjectPermissions(Resource resource, ResourceAction resourceAction) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!(auth instanceof PlatformAuthenticationToken czertainlyAuthenticationToken)) {
+        if (!(auth instanceof PlatformAuthenticationToken authenticationToken)) {
             // return filter with empty permissions (no objects allowed)
             return new SecurityResourceFilter(List.of(), List.of(), true);
         }
 
         Map<String, String> properties = Map.of("name", resource.getCode(), "action", resourceAction.getCode());
         OpaRequestedResource resourceProps = new OpaRequestedResource(properties);
-        OpaObjectAccessResult result = opaClient.checkObjectAccess(OpaPolicy.OBJECTS.policyName, resourceProps, czertainlyAuthenticationToken.getPrincipal().getRawData(), new OpaRequestDetails(null));
+        OpaObjectAccessResult result = opaClient.checkObjectAccess(OpaPolicy.OBJECTS.policyName, resourceProps, authenticationToken.getPrincipal().getRawData(), new OpaRequestDetails(null));
 
         SecurityResourceFilter resourceFilter = SecurityResourceFilter.create();
         resourceFilter.setResource(resource);

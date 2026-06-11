@@ -61,7 +61,7 @@ public class SecurityConfig {
 
     private SigningProfileService signingProfileService;
 
-    private PlatformJwtDecoder czertainlyJwtDecoder;
+    private PlatformJwtDecoder platformJwtDecoder;
 
     private CredentialVerificationCache credentialVerificationCache;
 
@@ -147,7 +147,7 @@ public class SecurityConfig {
         // Order matters: a presented client certificate takes precedence over an Authorization header.
         List<TspAuthenticator> authenticators = List.of(
                 new ClientCertificateAuthenticator(authenticationClient, environment.getProperty(CERTIFICATE_HEADER_NAME), contextWriter),
-                new BearerTokenAuthenticator(czertainlyJwtDecoder, authenticationClient, contextWriter),
+                new BearerTokenAuthenticator(platformJwtDecoder, authenticationClient, contextWriter),
                 new BasicPasswordAuthenticator(credentialVerificationCache, contextWriter));
         return new TspAuthenticationFilter(
                 new TspRouteResolver(tspProfileService, signingProfileService),
@@ -213,8 +213,8 @@ public class SecurityConfig {
     }
 
     @Autowired
-    public void setPlatformJwtDecoder(PlatformJwtDecoder czertainlyJwtDecoder) {
-        this.czertainlyJwtDecoder = czertainlyJwtDecoder;
+    public void setPlatformJwtDecoder(PlatformJwtDecoder platformJwtDecoder) {
+        this.platformJwtDecoder = platformJwtDecoder;
     }
 
     @Autowired

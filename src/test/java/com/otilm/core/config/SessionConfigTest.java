@@ -88,7 +88,7 @@ class SessionConfigTest extends BaseSpringBootTestNoAuth {
     }
 
     /**
-     * For API endpoints the {@code czertainly-session} cookie must be forwarded to the session repository so that existing sessions can be resumed.
+     * For API endpoints the {@code session-id} cookie must be forwarded to the session repository so that existing sessions can be resumed.
      */
     @Test
     void request_resolvesIncomingSessionCookie() throws Exception {

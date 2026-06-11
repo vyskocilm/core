@@ -142,7 +142,7 @@ class CryptographicProviderTest {
         byte[] cmsDataStream = Base64.getDecoder().decode(encapsulatedString);
 
         PlatformPrivateKey privateKey = new PlatformPrivateKey(tokenInstanceReference.getTokenInstanceUuid(), key.getUuid().toString(), connector.mapToDto(), "RSA");
-        PlatformProvider czertainlyProvider = PlatformProvider.getInstance("Test", true, cryptographicOperationsApiClient);
+        PlatformProvider provider = PlatformProvider.getInstance("Test", true, cryptographicOperationsApiClient);
 
         CMSEnvelopedData envelopedData = new CMSEnvelopedData(cmsDataStream);
         RecipientInformationStore recipientInfos = envelopedData.getRecipientInfos();
@@ -152,7 +152,7 @@ class CryptographicProviderTest {
         if (recipientInformationIterator.hasNext()) {
             recipientInformationIterator.next();
             Assertions.assertDoesNotThrow(() -> new JceKeyTransEnvelopedRecipient(privateKey)
-                    .setProvider(czertainlyProvider)
+                    .setProvider(provider)
                     .setContentProvider(BouncyCastleProvider.PROVIDER_NAME)
                     .setMustProduceEncodableUnwrappedKey(true)
                     .setAlgorithmMapping(new ASN1ObjectIdentifier("1.2.840.113549.1.1.1"), "RSA"));

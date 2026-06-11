@@ -316,12 +316,12 @@ class OAuth2LoginControllerTest {
 
     private static String extractSessionCookie(HttpHeaders headers) {
         // Default for Spring Session/Tomcat is JSESSIONID; for Spring Session it can be SESSION.
-        // For CZERTAINLY, the custom session cookie name is czertainly-session.
+        // For CZERTAINLY, the custom session cookie name is session-id.
         List<String> setCookies = headers.allValues("Set-Cookie");
         Optional<String> match = setCookies.stream()
                 .map(HttpCookie::parse)
                 .flatMap(List::stream)
-                .filter(c -> c.getName().equalsIgnoreCase("JSESSIONID") || c.getName().equalsIgnoreCase("SESSION") || c.getName().equalsIgnoreCase("czertainly-session"))
+                .filter(c -> c.getName().equalsIgnoreCase("JSESSIONID") || c.getName().equalsIgnoreCase("SESSION") || c.getName().equalsIgnoreCase("session-id"))
                 .findFirst()
                 .map(c -> c.getName() + "=" + c.getValue());
 
