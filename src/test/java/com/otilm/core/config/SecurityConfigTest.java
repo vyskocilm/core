@@ -10,6 +10,8 @@ import com.otilm.core.util.*;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.nimbusds.jose.JOSEException;
+import com.otilm.core.util.BaseSpringBootTestNoAuth;
+import com.otilm.core.util.OAuth2Constants;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.*;
 import org.mockito.Mockito;

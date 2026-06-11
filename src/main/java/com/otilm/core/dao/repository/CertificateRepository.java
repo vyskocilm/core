@@ -3,6 +3,7 @@ package com.otilm.core.dao.repository;
 import com.otilm.api.model.core.certificate.CertificateDto;
 import com.otilm.api.model.core.certificate.CertificateState;
 import com.otilm.api.model.core.certificate.CertificateValidationStatus;
+import com.otilm.core.aop.CertificateRepositoryCacheEvictionAspect;
 import com.otilm.core.dao.entity.Certificate;
 import com.otilm.core.dao.entity.CertificateContent;
 import com.otilm.core.dao.entity.RaProfile;
@@ -26,7 +27,7 @@ import java.util.UUID;
  * Spring Data repository for {@link Certificate} entities.
  *
  * <p><strong>Cache eviction:</strong>
- * {@link com.otilm.core.aop.CertificateRepositoryCacheEvictionAspect} intercepts mutations on this
+ * {@link CertificateRepositoryCacheEvictionAspect} intercepts mutations on this
  * bean and evicts both the certificate-chain cache and the signing-certificate cache automatically —
  * callers do not need to evict manually.
  *

@@ -5,6 +5,7 @@ import com.otilm.api.model.common.enums.cryptography.KeyType;
 import com.otilm.api.model.core.certificate.*;
 import com.otilm.api.model.core.cryptography.key.KeyState;
 import com.otilm.core.dao.entity.Certificate;
+import com.otilm.core.dao.entity.CryptographicKey;
 import com.otilm.core.dao.entity.Group;
 import com.otilm.core.util.CertificateUtil;
 import com.otilm.core.util.MetaDefinitions;
@@ -22,8 +23,8 @@ public class CertificateDetailDtoMapper {
     }
 
     /**
-     * @param chainContext when {@code true}, key associations are mapped with {@link com.otilm.core.dao.entity.CryptographicKey#mapToChainDto()} (omits the {@code associations} count);
-     *                     when {@code false}, the full {@link com.otilm.core.dao.entity.CryptographicKey#mapToDto()} is used.
+     * @param chainContext when {@code true}, key associations are mapped with {@link CryptographicKey#mapToChainDto()} (omits the {@code associations} count);
+     *                     when {@code false}, the full {@link CryptographicKey#mapToDto()} is used.
      */
     private static CertificateDetailDto buildDetailDto(Certificate certificate, boolean chainContext) {
         final CertificateDetailDto dto = new CertificateDetailDto();

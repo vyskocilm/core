@@ -7,7 +7,6 @@ import com.otilm.core.model.auth.ResourceAction;
 import com.otilm.core.model.auth.ResourceSyncRequestDto;
 import com.otilm.core.security.authn.client.ResourceApiClient;
 import com.otilm.core.security.authn.client.RoleManagementApiClient;
-import com.otilm.core.security.authn.client.UserManagementApiClient;
 import com.otilm.core.util.AuthHelper;
 import com.otilm.core.util.DatabaseMigration;
 import org.flywaydb.core.api.migration.BaseJavaMigration;
@@ -20,7 +19,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -60,7 +58,7 @@ public class V202308050825__UpdateAcmeScepRolesPermissions extends BaseJavaMigra
         // seed issue action for certificate
         List<ResourceSyncRequestDto> resources = new ArrayList<>();
         ResourceSyncRequestDto resourceSyncRequestDto = new ResourceSyncRequestDto();
-        resourceSyncRequestDto.setName(com.otilm.core.model.auth.Resource.findByCode(com.otilm.api.model.core.auth.Resource.CERTIFICATE.getCode()));
+        resourceSyncRequestDto.setName(Resource.findByCode(com.otilm.api.model.core.auth.Resource.CERTIFICATE.getCode()));
         resourceSyncRequestDto.setActions(List.of(ResourceAction.ISSUE.getCode()));
         resources.add(resourceSyncRequestDto);
         resourceApiClient.addResources(resources);

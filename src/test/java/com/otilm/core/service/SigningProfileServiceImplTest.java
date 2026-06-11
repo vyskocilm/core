@@ -19,9 +19,6 @@ import com.otilm.api.model.common.attribute.common.content.AttributeContentType;
 import com.otilm.api.model.common.attribute.common.properties.CustomAttributeProperties;
 import com.otilm.api.model.common.attribute.v2.content.StringAttributeContentV2;
 import com.otilm.api.model.common.attribute.v3.CustomAttributeV3;
-
-import static com.otilm.core.util.builders.RequestAttributeV3Builder.aCustomAttribute;
-
 import com.otilm.api.model.common.enums.cryptography.RsaSignatureScheme;
 import com.otilm.core.attribute.RsaSignatureAttributes;
 import com.otilm.core.attribute.engine.AttributeEngine;
@@ -70,11 +67,11 @@ import com.otilm.core.security.authz.SecurityFilter;
 import com.otilm.core.service.v2.ConnectorService;
 import com.otilm.core.service.writer.signingrecord.SigningRecordWriter;
 import com.otilm.core.util.BaseSpringBootTest;
+import com.otilm.core.util.mocks.ConnectorMockFactory;
 import com.otilm.core.util.mocks.ContentSigningFormatterMock;
 import com.otilm.core.util.mocks.CryptographyProviderConnectorMock;
 import com.otilm.core.util.mocks.SignerConnectorMock;
 import com.otilm.core.util.mocks.TimestampingFormatterConnectorMock;
-import com.otilm.core.util.seeders.FunctionGroupSeeder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -96,6 +93,7 @@ import static com.otilm.core.util.builders.ConnectorRequestDtoBuilder.aV2Connect
 import static com.otilm.core.util.builders.KeyPairRequestDtoBuilder.aKeyPairRequest;
 import static com.otilm.core.util.builders.SearchFilterRequestDtoBuilder.aPropertyEqualsFilter;
 import static com.otilm.core.util.builders.SearchRequestDtoBuilder.aSearchRequest;
+import static com.otilm.core.util.builders.RequestAttributeV3Builder.aCustomAttribute;
 import static com.otilm.core.util.builders.RsaSignatureAttributesBuilder.rsaSignatureAttributes;
 import static com.otilm.core.util.builders.SigningProfileRequestDtoBuilder.aSigningProfileRequest;
 import static com.otilm.core.util.builders.SigningProfileRequestDtoBuilder.aSigningProfileRequestFromExistingProfile;
@@ -132,7 +130,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     private TimeQualityConfigurationService timeQualityConfigurationService;
 
     @Autowired
-    private FunctionGroupSeeder functionGroupSeeder;
+    private ConnectorMockFactory connectorMockFactory;
 
     @Autowired
     private TestCertificateAuthority testCertificateAuthority;
@@ -169,18 +167,39 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     @Autowired
     private AttributeRelationRepository attributeRelationRepository;
 
+    private static String firstErrorMessage(ValidationException ex) {
+        return ex.getErrors().stream()
+                .map(ValidationError::getErrorDescription)
+                .findFirst()
+                .orElse("");
+    }
+
+    private static String extractStringAttrValue(List<ResponseAttribute> attrs, String name) {
+        ResponseAttributeV2 attr = (ResponseAttributeV2) attrs.stream()
+                .filter(a -> name.equals(a.getName()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Attribute '" + name + "' not found in: " + attrs));
+        return attr.getContent().getFirst().getData().toString();
+    }
+
+    private static RequestAttribute aStringAttribute(UUID uuid, String name, String value) {
+        RequestAttributeV2 attr = new RequestAttributeV2();
+        attr.setUuid(uuid);
+        attr.setName(name);
+        attr.setContentType(AttributeContentType.STRING);
+        attr.setContent(List.of(new StringAttributeContentV2(value, value)));
+        return attr;
+    }
 
     @BeforeEach
     void setUp() throws Exception {
 
-        // Seed platform reference data normally provided by Flyway (wiped by per-test truncation)
-        functionGroupSeeder.seedCryptographyProvider();
-
-        // Set up mocks of connectors (the servers to call)
-        cryptographyProviderServerMock = CryptographyProviderConnectorMock.start();
-        contentSigningFormatterMock = ContentSigningFormatterMock.start();
-        timestampingFormatterMock = TimestampingFormatterConnectorMock.start();
-        signerConnectorServerMock = SignerConnectorMock.start();
+        // Set up mocks of connectors (the servers to call); the cryptography-provider mock also seeds
+        // the function-group reference data normally provided by Flyway (wiped by per-test truncation)
+        cryptographyProviderServerMock = connectorMockFactory.startCryptographyProvider();
+        contentSigningFormatterMock = connectorMockFactory.startContentSigningFormatter();
+        timestampingFormatterMock = connectorMockFactory.startTimestampingFormatter();
+        signerConnectorServerMock = connectorMockFactory.startSigner();
 
         // Register the connectors to ILM
         cryptographyProviderConnector = connectorService.createConnector(
@@ -310,13 +329,6 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
     private void createSigningRecordFor(SigningProfileDto profile) {
         signingRecordWriter.insert(aSigningRecord()
                 .withSigningProfile(profile).build());
-    }
-
-    private static String firstErrorMessage(ValidationException ex) {
-        return ex.getErrors().stream()
-                .map(ValidationError::getErrorDescription)
-                .findFirst()
-                .orElse("");
     }
 
     @Test
@@ -545,9 +557,11 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
 
             // then: version 1 still has the original RAW workflow
             SigningProfileDto previousProfileVersion = signingProfileService.getSigningProfile(profileUuid, 1);
-            assertEquals("workflow-update", existingProfile.getName());
-            assertEquals(1, existingProfile.getVersion());
             assertInstanceOf(RawSigningWorkflowDto.class, previousProfileVersion.getWorkflow());
+
+            // and: version 2 has the new TIMESTAMPING workflow
+            SigningProfileDto updatedProfile = signingProfileService.getSigningProfile(profileUuid, 2);
+            assertInstanceOf(TimestampingWorkflowDto.class, updatedProfile.getWorkflow());
         }
 
         @Test
@@ -1718,7 +1732,7 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             contentSigningFormatterMock.stubFormatterAttributeDefinition(attrUuid, attrName);
 
             // and: a second content signing formatter connector (formatterB)
-            ContentSigningFormatterMock formatterBMock = ContentSigningFormatterMock.start();
+            ContentSigningFormatterMock formatterBMock = connectorMockFactory.startContentSigningFormatter();
             formatterBMock.stubFormatterAttributeDefinition(attrUuid, attrName);
             ConnectorDetailDto formatterBConnector = connectorService.createConnector(
                     aV2ConnectorRequest()
@@ -2036,6 +2050,86 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             assertEquals("updated description", updated.getDescription());
         }
 
+        @Test
+        void timestamping_staticKeyScheme_returnsTypedModelWithResolvedCertificate()
+                throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
+            // given
+            signingProfileService.createSigningProfile(
+                    aSigningProfileRequest()
+                            .withName("ts-managed-model")
+                            .withStaticKeyManagedSigning(defaultSigningCertificate.getUuid())
+                            .withTimestamping(aTimestampingWorkflow()
+                                    .withSignatureFormatterConnector(UUID.fromString(timestampingFormatterConnector.getUuid()))
+                                    .build())
+                            .build());
+
+            // when
+            SigningProfileModel<?, ?> model =
+                    signingProfileService.getSigningProfileModel("ts-managed-model");
+
+            // then
+            assertInstanceOf(ManagedTimestampingWorkflow.class, model.workflow());
+            assertInstanceOf(StaticKeyManagedSigning.class, model.signingScheme());
+            StaticKeyManagedSigning schemeModel = (StaticKeyManagedSigning) model.signingScheme();
+            assertEquals(defaultSigningCertificate.getUuid(), schemeModel.certificateUuid());
+        }
+
+        @Test
+        void validationPropertiesRoundTrip()
+                throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
+            // given
+            signingProfileService.createSigningProfile(
+                    aSigningProfileRequest()
+                            .withName("ts-managed-validation-props")
+                            .withStaticKeyManagedSigning(defaultSigningCertificate.getUuid())
+                            .withTimestamping(aTimestampingWorkflow()
+                                    .withSignatureFormatterConnector(UUID.fromString(timestampingFormatterConnector.getUuid()))
+                                    .withDefaultPolicyId("1.2.3.4.5")
+                                    .withAllowedPolicyIds(List.of("1.2.3.4.5", "1.2.3.4.6"))
+                                    .withAllowedDigestAlgorithms(List.of(DigestAlgorithm.SHA_256))
+                                    .withValidateTokenSignature(true)
+                                    .build())
+                            .build());
+
+            // when
+            SigningProfileModel<?, ?> model =
+                    signingProfileService.getSigningProfileModel("ts-managed-validation-props");
+
+            // then
+            assertInstanceOf(ManagedTimestampingWorkflow.class, model.workflow());
+            ManagedTimestampingWorkflow wf = (ManagedTimestampingWorkflow) model.workflow();
+            assertEquals("1.2.3.4.5", wf.defaultPolicyId());
+            assertEquals(List.of("1.2.3.4.5", "1.2.3.4.6"), wf.allowedPolicyIds());
+            assertEquals(List.of(DigestAlgorithm.SHA_256), wf.allowedDigestAlgorithms());
+            assertTrue(wf.validateTokenSignature());
+        }
+
+        @Test
+        void baseFieldsArePropagatedToModel()
+                throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
+            // given
+            SigningProfileDto created = signingProfileService.createSigningProfile(
+                    aSigningProfileRequest()
+                            .withName("ts-managed-base-fields")
+                            .withDescription("expected ts description")
+                            .withStaticKeyManagedSigning(defaultSigningCertificate.getUuid())
+                            .withTimestamping(aTimestampingWorkflow()
+                                    .withSignatureFormatterConnector(UUID.fromString(timestampingFormatterConnector.getUuid()))
+                                    .build())
+                            .build());
+
+            // when
+            SigningProfileModel<?, ?> model =
+                    signingProfileService.getSigningProfileModel("ts-managed-base-fields");
+
+            // then
+            assertEquals("ts-managed-base-fields", model.name());
+            assertEquals("expected ts description", model.description());
+            assertEquals(UUID.fromString(created.getUuid()), model.uuid());
+            assertEquals(1, model.version());
+            assertFalse(model.enabled());
+        }
+
         @Nested
         class TimeQualityConfiguration {
 
@@ -2264,102 +2358,5 @@ class SigningProfileServiceImplTest extends BaseSpringBootTest {
             }
         }
 
-        @Test
-        void timestamping_staticKeyScheme_returnsTypedModelWithResolvedCertificate()
-                throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
-            // given
-            signingProfileService.createSigningProfile(
-                    aSigningProfileRequest()
-                            .withName("ts-managed-model")
-                            .withStaticKeyManagedSigning(defaultSigningCertificate.getUuid())
-                            .withTimestamping(aTimestampingWorkflow()
-                                    .withSignatureFormatterConnector(UUID.fromString(timestampingFormatterConnector.getUuid()))
-                                    .build())
-                            .build());
-
-            // when
-            SigningProfileModel<?, ?> model =
-                    signingProfileService.getSigningProfileModel("ts-managed-model");
-
-            // then
-            assertInstanceOf(ManagedTimestampingWorkflow.class, model.workflow());
-            assertInstanceOf(StaticKeyManagedSigning.class, model.signingScheme());
-            StaticKeyManagedSigning schemeModel = (StaticKeyManagedSigning) model.signingScheme();
-            assertEquals(defaultSigningCertificate.getUuid(), schemeModel.certificateUuid());
-        }
-
-        @Test
-        void validationPropertiesRoundTrip()
-                throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
-            // given
-            signingProfileService.createSigningProfile(
-                    aSigningProfileRequest()
-                            .withName("ts-managed-validation-props")
-                            .withStaticKeyManagedSigning(defaultSigningCertificate.getUuid())
-                            .withTimestamping(aTimestampingWorkflow()
-                                    .withSignatureFormatterConnector(UUID.fromString(timestampingFormatterConnector.getUuid()))
-                                    .withDefaultPolicyId("1.2.3.4.5")
-                                    .withAllowedPolicyIds(List.of("1.2.3.4.5", "1.2.3.4.6"))
-                                    .withAllowedDigestAlgorithms(List.of(DigestAlgorithm.SHA_256))
-                                    .withValidateTokenSignature(true)
-                                    .build())
-                            .build());
-
-            // when
-            SigningProfileModel<?, ?> model =
-                    signingProfileService.getSigningProfileModel("ts-managed-validation-props");
-
-            // then
-            assertInstanceOf(ManagedTimestampingWorkflow.class, model.workflow());
-            ManagedTimestampingWorkflow wf = (ManagedTimestampingWorkflow) model.workflow();
-            assertEquals("1.2.3.4.5", wf.defaultPolicyId());
-            assertEquals(List.of("1.2.3.4.5", "1.2.3.4.6"), wf.allowedPolicyIds());
-            assertEquals(List.of(DigestAlgorithm.SHA_256), wf.allowedDigestAlgorithms());
-            assertTrue(wf.validateTokenSignature());
-        }
-
-        @Test
-        void baseFieldsArePropagatedToModel()
-                throws AlreadyExistException, AttributeException, ConnectorException, NotFoundException {
-            // given
-            SigningProfileDto created = signingProfileService.createSigningProfile(
-                    aSigningProfileRequest()
-                            .withName("ts-managed-base-fields")
-                            .withDescription("expected ts description")
-                            .withStaticKeyManagedSigning(defaultSigningCertificate.getUuid())
-                            .withTimestamping(aTimestampingWorkflow()
-                                    .withSignatureFormatterConnector(UUID.fromString(timestampingFormatterConnector.getUuid()))
-                                    .build())
-                            .build());
-
-            // when
-            SigningProfileModel<?, ?> model =
-                    signingProfileService.getSigningProfileModel("ts-managed-base-fields");
-
-            // then
-            assertEquals("ts-managed-base-fields", model.name());
-            assertEquals("expected ts description", model.description());
-            assertEquals(UUID.fromString(created.getUuid()), model.uuid());
-            assertEquals(1, model.version());
-            assertFalse(model.enabled());
-        }
-
-    }
-
-    private static String extractStringAttrValue(List<ResponseAttribute> attrs, String name) {
-        ResponseAttributeV2 attr = (ResponseAttributeV2) attrs.stream()
-                .filter(a -> name.equals(a.getName()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("Attribute '" + name + "' not found in: " + attrs));
-        return attr.getContent().getFirst().getData().toString();
-    }
-
-    private static RequestAttribute aStringAttribute(UUID uuid, String name, String value) {
-        RequestAttributeV2 attr = new RequestAttributeV2();
-        attr.setUuid(uuid);
-        attr.setName(name);
-        attr.setContentType(AttributeContentType.STRING);
-        attr.setContent(List.of(new StringAttributeContentV2(value, value)));
-        return attr;
     }
 }

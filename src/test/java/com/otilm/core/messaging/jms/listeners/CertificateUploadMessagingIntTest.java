@@ -7,7 +7,6 @@ import com.otilm.core.service.CertificateService;
 import com.otilm.core.util.BaseMessagingIntTest;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.security.cert.X509Certificate;

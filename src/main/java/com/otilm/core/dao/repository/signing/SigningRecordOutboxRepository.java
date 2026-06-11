@@ -1,6 +1,7 @@
 package com.otilm.core.dao.repository.signing;
 
 import com.otilm.core.dao.entity.signing.SigningRecordOutbox;
+import com.otilm.core.signing.record.SigningRecordOutboxDrainer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,7 +19,7 @@ public interface SigningRecordOutboxRepository extends JpaRepository<SigningReco
     /**
      * Returns the oldest drainable rows (attempts still below the poison threshold), oldest first. No row
      * locking: cross-node mutual exclusion for the drain is provided by a cluster-wide advisory lock held by
-     * {@link com.otilm.core.signing.record.SigningRecordOutboxDrainer}, so a plain ordered read is
+     * {@link SigningRecordOutboxDrainer}, so a plain ordered read is
      * enough and avoids holding row locks across the per-row drain transactions.
      */
     @Query(value = """

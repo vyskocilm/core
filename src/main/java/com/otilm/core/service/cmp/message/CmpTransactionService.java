@@ -1,6 +1,7 @@
 package com.otilm.core.service.cmp.message;
 
 import com.otilm.api.model.core.cmp.CmpTransactionState;
+import com.otilm.core.dao.entity.Certificate;
 import com.otilm.core.dao.entity.cmp.CmpProfile;
 import com.otilm.core.dao.entity.cmp.CmpTransaction;
 import com.otilm.core.dao.repository.cmp.CmpTransactionRepository;
@@ -26,14 +27,14 @@ public class CmpTransactionService {
     }
 
     /**
-     * List of transactions for given transactionId (even if current version of cmp czertainly
+     * List of transactions for given transactionId (even if current version of cmp ilm
      * works with one request per transactionId).
      *
      * <p>List is prepare for future behaviour of CMP protocol (ir,cr,kur allows to process list of requests). It means
      * the given transactionId can keep relation to many request subjects (certificates).</p>
      *
      * <p>There's a next solution to move m:n relationship to another table (with removing certificate
-     * column in {@link CmpTransactionService}) with list of {@link com.otilm.core.dao.entity.Certificate}</p>
+     * column in {@link CmpTransactionService}) with list of {@link Certificate}</p>
      *
      * @param transactionId unique identifier of transaction
      * @return list of transactions

@@ -1,5 +1,6 @@
 package com.otilm.core.service;
 
+import com.otilm.core.attribute.CsrAttributes;
 import com.otilm.api.exception.*;
 import com.otilm.api.model.client.attribute.RequestAttributeV2;
 import com.otilm.api.model.client.attribute.RequestAttributeV3;
@@ -7,6 +8,9 @@ import com.otilm.api.model.core.other.ResourceEvent;
 import com.otilm.api.model.core.search.FilterConditionOperator;
 import com.otilm.api.model.core.search.FilterFieldSource;
 import com.otilm.api.model.core.workflows.*;
+import com.otilm.core.dao.entity.*;
+import com.otilm.core.dao.entity.Certificate;
+import com.otilm.core.dao.repository.*;
 import com.otilm.core.enums.FilterField;
 import com.otilm.api.model.client.attribute.custom.CustomAttributeCreateRequestDto;
 import com.otilm.api.model.client.certificate.*;
@@ -448,7 +452,7 @@ class CertificateServiceTest extends BaseSpringBootTest {
         commonNameAttr.setUuid(UUID.fromString(CsrAttributes.COMMON_NAME_UUID));
         commonNameAttr.setName(CsrAttributes.COMMON_NAME_ATTRIBUTE_NAME);
         commonNameAttr.setContentType(AttributeContentType.STRING);
-        commonNameAttr.setContent(List.of(new StringAttributeContentV2("czertainly.com", "czertainly.com")));
+        commonNameAttr.setContent(List.of(new StringAttributeContentV2("domain.com", "domain.com")));
         attributeEngine.updateObjectDataAttributesContent(
                 ObjectAttributeContentInfo.builder(Resource.CERTIFICATE_REQUEST, csrEntity.getUuid()).build(),
                 List.of(commonNameAttr)

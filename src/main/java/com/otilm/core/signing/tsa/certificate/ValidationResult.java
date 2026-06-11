@@ -1,9 +1,10 @@
 package com.otilm.core.signing.tsa.certificate;
 
 import com.otilm.api.interfaces.core.tsp.error.TspFailureInfo;
+import com.otilm.core.model.signing.resolved.ResolvedManagedScheme;
 
 /**
- * Result of {@link SigningCertificateValidator#validate(com.otilm.core.model.signing.resolved.ResolvedManagedScheme, boolean)}.
+ * Result of {@link SigningCertificateValidator#validate(ResolvedManagedScheme, boolean)}.
  *
  * <p>Use pattern matching to handle each case:
  * <pre>{@code

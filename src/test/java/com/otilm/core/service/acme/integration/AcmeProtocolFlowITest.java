@@ -95,7 +95,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
  * Challenge HTTP validation is simulated by directly setting the entity state in the database,
  * which is appropriate for a service-layer integration test.
  * Certificate issuance via the connector is driven through the real
- * {@link com.otilm.core.service.v2.ClientOperationService} code path: the
+ * {@link ClientOperationService} code path: the
  * {@link ActionProducer} is spied on so that each {@code ActionMessage} is dispatched
  * synchronously to {@code issueCertificateAction} instead of being sent over RabbitMQ.
  */

@@ -4,6 +4,7 @@ import com.otilm.core.dao.entity.signing.SigningRecord;
 import com.otilm.core.dao.entity.signing.SigningRecordOutbox;
 import com.otilm.core.dao.repository.signing.SigningRecordOutboxRepository;
 import com.otilm.core.dao.repository.signing.SigningRecordRepository;
+import com.otilm.core.signing.record.SigningRecordOutboxDrainer;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -81,7 +82,7 @@ public class SigningRecordWriter {
      * id via {@link SigningRecordOutboxRepository#deleteByUuid(UUID)} — a bare {@code DELETE} that reads no
      * blobs and no-ops if the row is already gone — so the copy is idempotent. The orchestration around it —
      * reading the outbox row, mapping it, and skipping an already-drained row — lives in
-     * {@link com.otilm.core.signing.record.SigningRecordOutboxDrainer}.
+     * {@link SigningRecordOutboxDrainer}.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveRecordAndDeleteOutbox(SigningRecord signingRecord) {

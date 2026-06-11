@@ -21,6 +21,7 @@ import com.otilm.core.service.v2.ConnectorService;
 import com.otilm.core.service.writer.signingrecord.SigningRecordWriter;
 import com.otilm.core.util.BaseSpringBootTest;
 import com.otilm.core.util.builders.SearchRequestDtoBuilder;
+import com.otilm.core.util.mocks.ConnectorMockFactory;
 import com.otilm.core.util.mocks.SignerConnectorMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,13 +73,16 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
     @Autowired
     private ConnectorService connectorService;
 
+    @Autowired
+    private ConnectorMockFactory connectorMockFactory;
+
     private SignerConnectorMock signerConnectorMock;
     private ConnectorDetailDto signerConnector;
     private SigningProfileDto defaultProfile;
 
     @BeforeEach
     void setUp() throws Exception {
-        signerConnectorMock = SignerConnectorMock.start();
+        signerConnectorMock = connectorMockFactory.startSigner();
         signerConnector = connectorService.createConnector(
                 aV2ConnectorRequest()
                         .withName("signer")
@@ -258,9 +262,9 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
         @Test
         void returnsOnlyRecordsForRequestedSigningProfile() throws Exception {
             // given
-            SigningProfileDto targetProfile = createSigningProfile("target-profile");
-            insertRecord(targetProfile, VERSION_1, "target-record");
-            insertRecord(defaultProfile, VERSION_1, "other-record");
+            SigningProfileDto targetProfile = createSigningProfile(ALPHA_PROFILE);
+            insertRecord(targetProfile, VERSION_1, ALPHA_RECORD_V1);
+            insertRecord(defaultProfile, VERSION_1, "other-record-v1");
 
             // when
             PaginationResponseDto<SigningRecordListDto> response = signingRecordService.listSigningRecordsForProfile(
@@ -268,7 +272,7 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
 
             // then
             assertEquals(1, response.getTotalItems());
-            assertEquals("target-record", response.getItems().getFirst().getName());
+            assertEquals(ALPHA_RECORD_V1, response.getItems().getFirst().getName());
         }
 
         @Test
@@ -282,6 +286,70 @@ class SigningRecordServiceTest extends BaseSpringBootTest {
 
             // then
             assertTrue(response.getItems().isEmpty());
+        }
+
+        @Test
+        void listSigningRecordsForProfile_honorsAdditionalFiltersWithinTheProfileScope() throws Exception {
+            // given
+            SigningProfileDto targetProfile = createSigningProfile(ALPHA_PROFILE);
+            insertRecord(targetProfile, VERSION_1, ALPHA_RECORD_V1);
+            bumpToNextVersion(targetProfile);
+            insertRecord(targetProfile, VERSION_2, ALPHA_RECORD_V2);
+            SearchRequestDto onlyVersion2 = SearchRequestDtoBuilder.aSearchRequest()
+                    .withPropertyFilter(FilterField.SIGNING_RECORD_SIGNING_PROFILE_VERSION.name(), FilterConditionOperator.EQUALS, VERSION_2)
+                    .build();
+
+            // when
+            PaginationResponseDto<SigningRecordListDto> response =
+                    signingRecordService.listSigningRecordsForProfile(UUID.fromString(targetProfile.getUuid()), onlyVersion2, SecurityFilter.create());
+
+            // then
+            assertEquals(1, response.getTotalItems());
+            assertEquals(ALPHA_RECORD_V2, response.getItems().getFirst().getName());
+        }
+
+        @Test
+        void listSigningRecordsForProfile_filterCannotWidenScopeToAnotherProfile() throws Exception {
+            // given: scope to alpha but ask for beta records — the profile scope is an AND, not overridable
+            SigningProfileDto alphaProfile = createSigningProfile(ALPHA_PROFILE);
+            SigningProfileDto betaProfile = createSigningProfile(BETA_PROFILE);
+            insertRecord(alphaProfile, VERSION_1, ALPHA_RECORD_V1);
+            insertRecord(betaProfile, VERSION_1, BETA_RECORD_V1);
+            SearchRequestDto onlyBetaProfile = SearchRequestDtoBuilder.aSearchRequest()
+                    .withPropertyFilter(FilterField.SIGNING_RECORD_SIGNING_PROFILE.name(), FilterConditionOperator.EQUALS, BETA_PROFILE)
+                    .build();
+
+            // when
+            PaginationResponseDto<SigningRecordListDto> response =
+                    signingRecordService.listSigningRecordsForProfile(UUID.fromString(alphaProfile.getUuid()),
+                            onlyBetaProfile,
+                            SecurityFilter.create());
+
+            // then
+            assertEquals(0, response.getTotalItems());
+            assertTrue(response.getItems().isEmpty());
+        }
+
+        @Test
+        void listSigningRecordsForProfile_paginatesWithinTheProfileScope() throws Exception {
+            // given
+            SigningProfileDto alphaProfile = createSigningProfile(ALPHA_PROFILE);
+            insertRecord(alphaProfile, VERSION_1, ALPHA_RECORD_V1);
+            bumpToNextVersion(alphaProfile);
+            insertRecord(alphaProfile, VERSION_2, ALPHA_RECORD_V2);
+            SearchRequestDto firstPageOfOne = SearchRequestDtoBuilder.aSearchRequest()
+                    .withPageNumber(1)
+                    .withItemsPerPage(1)
+                    .build();
+
+            // when
+            PaginationResponseDto<SigningRecordListDto> response =
+                    signingRecordService.listSigningRecordsForProfile(UUID.fromString(alphaProfile.getUuid()), firstPageOfOne,
+                            SecurityFilter.create());
+
+            // then
+            assertEquals(2, response.getTotalItems());
+            assertEquals(1, response.getItems().size());
         }
     }
 

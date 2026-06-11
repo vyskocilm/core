@@ -44,6 +44,7 @@ import com.otilm.core.security.authz.SecuredUUID;
 import com.otilm.core.security.authz.SecurityFilter;
 import com.otilm.core.service.*;
 import com.otilm.core.util.*;
+import com.otilm.core.service.v2.ConnectorService;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
@@ -108,7 +109,7 @@ public class CryptographicKeyServiceImpl implements CryptographicKeyService {
     // --------------------------------------------------------------------------------
     private AttributeEngine attributeEngine;
     private ConnectorApiFactory connectorApiFactory;
-    private com.otilm.core.service.v2.ConnectorService connectorService;
+    private ConnectorService connectorService;
     private TokenInstanceService tokenInstanceService;
     private CryptographicKeyEventHistoryService keyEventHistoryService;
     private PermissionEvaluator permissionEvaluator;
@@ -158,7 +159,7 @@ public class CryptographicKeyServiceImpl implements CryptographicKeyService {
     }
 
     @Autowired
-    public void setConnectorService(com.otilm.core.service.v2.ConnectorService connectorService) {
+    public void setConnectorService(ConnectorService connectorService) {
         this.connectorService = connectorService;
     }
 

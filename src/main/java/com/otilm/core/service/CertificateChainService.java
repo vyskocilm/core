@@ -1,6 +1,7 @@
 package com.otilm.core.service;
 
 import com.otilm.core.dao.entity.Certificate;
+import com.otilm.core.service.writer.CertificateChainWriter;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -9,7 +10,7 @@ import java.util.List;
 /**
  * <p>Performs certificate-chain reconstruction (looking up issuers in the local inventory, optionally downloading
  * missing chain certificates from the AIA extension) and persisting the resulting issuer references through
- * {@link com.otilm.core.service.writer.CertificateChainWriter}.</p>
+ * {@link CertificateChainWriter}.</p>
  */
 public interface CertificateChainService {
 

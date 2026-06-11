@@ -60,7 +60,7 @@ public class AuditLogAspect {
     }
 
 
-    @Around("@annotation(AuditLogged)")
+    @Around("@annotation(com.otilm.core.aop.AuditLogged)")
     public Object log(ProceedingJoinPoint joinPoint) throws Throwable {
         LoggingSettingsDto loggingSettingsDto = SettingsCache.getSettings(SettingsSection.LOGGING);
         if (loggingSettingsDto == null || (loggingSettingsDto.getAuditLogs().getOutput() == AuditLogOutput.NONE)) {

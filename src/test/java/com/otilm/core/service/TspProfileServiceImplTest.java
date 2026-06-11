@@ -7,6 +7,8 @@ import com.otilm.api.exception.ValidationException;
 import com.otilm.api.model.client.attribute.RequestAttributeV3;
 import com.otilm.api.model.client.attribute.ResponseAttributeV3;
 import com.otilm.api.model.client.certificate.SearchRequestDto;
+import com.otilm.api.model.client.signing.profile.scheme.SigningScheme;
+import com.otilm.api.model.client.signing.profile.workflow.SigningWorkflowType;
 import com.otilm.api.model.client.signing.protocols.tsp.TspProfileDto;
 import com.otilm.api.model.client.signing.protocols.tsp.TspProfileListDto;
 import com.otilm.api.model.client.signing.protocols.tsp.TspProfileRequestDto;
@@ -33,6 +35,8 @@ import com.otilm.core.dao.repository.signing.TspProfileBasicCredentialRepository
 import com.otilm.core.dao.repository.signing.TspProfileRepository;
 import com.otilm.core.model.signing.TspProfileModel;
 import com.otilm.core.security.authn.client.CredentialVerificationCache;
+import com.otilm.core.dao.entity.signing.SigningProfile;
+import com.otilm.core.dao.repository.signing.SigningProfileRepository;
 import com.otilm.core.security.authz.SecuredUUID;
 import com.otilm.core.security.authz.SecurityFilter;
 import com.otilm.core.util.BaseSpringBootTest;
@@ -67,6 +71,9 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Autowired
     private TspProfileRepository tspRepository;
+
+    @Autowired
+    private SigningProfileRepository signingProfileRepository;
 
     @MockitoSpyBean
     private TspProfileRepository tspRepositorySpy;
@@ -156,6 +163,39 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         Assertions.assertEquals(1, response.getTotalItems());
         Assertions.assertEquals(savedTspProfile.getUuid().toString(), response.getItems().getFirst().getUuid());
         Assertions.assertEquals(savedTspProfile.getName(), response.getItems().getFirst().getName());
+    }
+
+    @Test
+    void testListTspProfiles_withoutDefaultSigningProfile_signingUrlIsNull() {
+        SearchRequestDto request = new SearchRequestDto();
+        PaginationResponseDto<TspProfileListDto> response = tspService.listTspProfiles(request, SecurityFilter.create());
+
+        Assertions.assertEquals(1, response.getTotalItems());
+        Assertions.assertNull(response.getItems().getFirst().getSigningUrl(),
+                "signingUrl must be null on the list DTO when no default signing profile is set");
+    }
+
+    @Test
+    void testListTspProfiles_withDefaultSigningProfile_returnsSigningUrl() {
+        SigningProfile signingProfile = new SigningProfile();
+        signingProfile.setName("default-signing-profile-for-list");
+        signingProfile.setWorkflowType(SigningWorkflowType.TIMESTAMPING);
+        signingProfile.setSigningScheme(SigningScheme.MANAGED);
+        signingProfile.setLatestVersion(1);
+        signingProfile.setEnabled(true);
+        signingProfile = signingProfileRepository.saveAndFlush(signingProfile);
+
+        savedTspProfile.setDefaultSigningProfile(signingProfile);
+        savedTspProfile = tspRepository.save(savedTspProfile);
+
+        SearchRequestDto request = new SearchRequestDto();
+        PaginationResponseDto<TspProfileListDto> response = tspService.listTspProfiles(request, SecurityFilter.create());
+
+        TspProfileListDto listDto = response.getItems().getFirst();
+        Assertions.assertNotNull(listDto.getSigningUrl(),
+                "signingUrl must be populated on the list DTO when a default signing profile is set");
+        Assertions.assertTrue(listDto.getSigningUrl().endsWith("/v1/protocols/tsp/" + savedTspProfile.getName() + "/sign"),
+                "Unexpected signingUrl: " + listDto.getSigningUrl());
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.otilm.core;
 
+import com.otilm.core.util.BaseMessagingIntTest;
 import org.mockito.Mockito;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,7 +10,7 @@ import org.springframework.jms.core.JmsTemplate;
 
 /**
  * Configuration class for mocking the {@link JmsTemplate} bean during testing.
- * <p>There is also integration branch of tests represented by {@link com.otilm.core.util.BaseMessagingIntTest} and 'messaging-int-test' profile.</p>
+ * <p>There is also integration branch of tests represented by {@link BaseMessagingIntTest} and 'messaging-int-test' profile.</p>
 
  * This configuration is active when the 'test' profile is enabled, excluding the 'messaging-int-test' profile.
  * It is primarily used to prevent the actual instantiation and use of a real {@link JmsTemplate} during testing scenarios

@@ -80,7 +80,7 @@ public class AuthHelper {
     }
 
     @Autowired
-    public void setPlatformAuthenticationClient(PlatformAuthenticationClient authenticationClient) {
+    public void setAuthenticationClient(PlatformAuthenticationClient authenticationClient) {
         this.authenticationClient = authenticationClient;
     }
 

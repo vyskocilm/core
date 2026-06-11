@@ -26,6 +26,9 @@ import com.otilm.core.security.authz.ExternalAuthorization;
 import com.otilm.core.security.authz.SecuredUUID;
 import com.otilm.core.security.authz.SecurityFilter;
 import com.otilm.core.service.*;
+import com.otilm.core.service.ComplianceProfileExternalService;
+import com.otilm.core.service.ComplianceProfileInternalService;
+import com.otilm.core.service.v2.ComplianceProfileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +41,7 @@ import java.util.UUID;
 @Transactional
 public class ComplianceProfileServiceImpl implements ComplianceProfileExternalService, ComplianceProfileInternalService {
 
-    private com.otilm.core.service.v2.ComplianceProfileService complianceProfileServiceV2;
+    private ComplianceProfileService complianceProfileServiceV2;
 
     private ConnectorRepository connectorRepository;
     private RaProfileRepository raProfileRepository;
@@ -65,7 +68,7 @@ public class ComplianceProfileServiceImpl implements ComplianceProfileExternalSe
     }
 
     @Autowired
-    public void setComplianceProfileServiceV2(com.otilm.core.service.v2.ComplianceProfileService complianceProfileServiceV2) {
+    public void setComplianceProfileServiceV2(ComplianceProfileService complianceProfileServiceV2) {
         this.complianceProfileServiceV2 = complianceProfileServiceV2;
     }
 

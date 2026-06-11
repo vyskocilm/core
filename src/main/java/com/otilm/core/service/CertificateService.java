@@ -16,6 +16,7 @@ import com.otilm.core.dao.entity.Certificate;
 import com.otilm.core.dao.entity.CertificateContent;
 import com.otilm.core.dao.entity.RaProfile;
 import com.otilm.core.model.auth.CertificateProtocolInfo;
+import com.otilm.core.config.cache.CacheConfig;
 import com.otilm.core.model.signing.SigningCertificate;
 import com.otilm.core.security.authz.SecuredUUID;
 import com.otilm.core.security.authz.SecurityFilter;
@@ -65,7 +66,7 @@ public interface CertificateService extends ResourceExtensionService {
 
     /**
      * Hot-path accessor for digital signing. Returns an immutable snapshot of the certificate's acceptability data and
-     * structural key references, cached in {@link com.otilm.core.config.cache.CacheConfig#SIGNING_CERTIFICATE_CACHE}.
+     * structural key references, cached in {@link CacheConfig#SIGNING_CERTIFICATE_CACHE}.
      *
      * <p>No authorization check — must not be called from REST controllers.
      *

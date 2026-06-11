@@ -2,6 +2,9 @@ package com.otilm.core.service;
 
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.exception.ValidationException;
+import com.otilm.core.dao.entity.*;
+import com.otilm.core.dao.entity.Certificate;
+import com.otilm.core.dao.repository.*;
 import com.otilm.core.events.handlers.CertificateUploadedEventHandler;
 import com.otilm.api.model.client.connector.v2.ConnectorVersion;
 import com.otilm.api.model.common.enums.cryptography.KeyAlgorithm;

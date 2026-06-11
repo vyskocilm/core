@@ -22,11 +22,16 @@ import com.otilm.api.model.core.connector.ConnectorStatus;
 import com.otilm.api.model.core.connector.FunctionGroupCode;
 import com.otilm.api.model.core.discovery.DiscoveryStatus;
 import com.otilm.api.model.core.search.FilterConditionOperator;
-import com.otilm.api.model.core.search.FilterFieldSource;
 import com.otilm.core.attribute.engine.AttributeEngine;
 import com.otilm.core.attribute.engine.records.ObjectAttributeContentInfo;
-import com.otilm.core.dao.entity.*;
-import com.otilm.core.dao.repository.*;
+import com.otilm.core.dao.entity.Connector;
+import com.otilm.core.dao.entity.Connector2FunctionGroup;
+import com.otilm.core.dao.entity.DiscoveryHistory;
+import com.otilm.core.dao.entity.FunctionGroup;
+import com.otilm.core.dao.repository.Connector2FunctionGroupRepository;
+import com.otilm.core.dao.repository.ConnectorRepository;
+import com.otilm.core.dao.repository.DiscoveryRepository;
+import com.otilm.core.dao.repository.FunctionGroupRepository;
 import com.otilm.core.enums.FilterField;
 import com.otilm.core.security.authz.SecurityFilter;
 import com.otilm.core.service.DiscoveryService;
@@ -44,6 +49,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.otilm.core.util.builders.SearchFilterRequestDtoBuilder.aCustomAttributeFilter;
+import static com.otilm.core.util.builders.SearchFilterRequestDtoBuilder.aMetaAttributeFilter;
 import static com.otilm.core.util.builders.SearchFilterRequestDtoBuilder.aPropertyEqualsFilter;
 import static com.otilm.core.util.builders.SearchFilterRequestDtoBuilder.aPropertyFilter;
 import static com.otilm.core.util.builders.SearchFilterRequestDtoBuilder.aPropertyNotEqualsFilter;
@@ -306,7 +313,7 @@ class DiscoveryHistorySearchTest extends BaseSpringBootTest {
     @Test
     void testFilterDataByMetadata() {
         final List<SearchFilterRequestDto> filters = new ArrayList<>();
-        filters.add(new SearchFilterRequestDto(FilterFieldSource.META, "attributeMeta1|TEXT", FilterConditionOperator.CONTAINS, "-meta-"));
+        filters.add(aMetaAttributeFilter("attributeMeta1", AttributeContentType.TEXT, FilterConditionOperator.CONTAINS, "-meta-"));
         final DiscoveryResponseDto responseDto = retrieveTheDiscoveriesBySearch(filters);
         Assertions.assertEquals(1, responseDto.getDiscoveries().size());
     }
@@ -314,7 +321,7 @@ class DiscoveryHistorySearchTest extends BaseSpringBootTest {
     @Test
     void testFilterDataByCustomAttr() {
         final List<SearchFilterRequestDto> filters = new ArrayList<>();
-        filters.add(new SearchFilterRequestDto(FilterFieldSource.CUSTOM, "attributeCustom1|TEXT", FilterConditionOperator.CONTAINS, "-custom-"));
+        filters.add(aCustomAttributeFilter("attributeCustom1", AttributeContentType.TEXT, FilterConditionOperator.CONTAINS, "-custom-"));
         final DiscoveryResponseDto responseDto = retrieveTheDiscoveriesBySearch(filters);
         Assertions.assertEquals(1, responseDto.getDiscoveries().size());
     }

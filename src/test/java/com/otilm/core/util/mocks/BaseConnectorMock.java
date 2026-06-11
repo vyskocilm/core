@@ -14,13 +14,14 @@ import java.util.List;
 import static com.otilm.core.util.builders.ConnectorInfoBuilder.aConnectorInfo;
 
 /**
- * Base for WireMock servers that impersonate a CZERTAINLY connector.
+ * Base for WireMock servers that impersonate a ITILM connector.
  * <p>
  * Owns the WireMock server lifecycle and the generic discovery stubs shared by every connector flavour:
  * {@code GET /v1} (V1 function-group discovery) and {@code GET /v2/info} (V2 interface discovery).
  * Concrete subclasses (e.g. {@link TimestampingFormatterConnectorMock}, {@link CryptographyProviderConnectorMock})
  * add the function-specific stubs in their constructor.
- * Call {@link #stop()} in {@code @AfterEach}.
+ * Instances are created exclusively through {@link ConnectorMockFactory}, which injects any Spring beans
+ * a mock needs at start. Call {@link #stop()} in {@code @AfterEach}.
  */
 public abstract class BaseConnectorMock {
 
@@ -43,10 +44,6 @@ public abstract class BaseConnectorMock {
 
     public String getUrl() {
         return "http://localhost:" + server.port();
-    }
-
-    public WireMockServer getServer() {
-        return server;
     }
 
     public void stop() {

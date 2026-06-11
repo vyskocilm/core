@@ -46,7 +46,7 @@ class RaProfileServiceTest extends ApprovalProfileData {
     private static final String RA_PROFILE_NAME = "testRaProfile1";
 
     @Autowired
-    private com.otilm.core.service.RaProfileService raProfileService;
+    private RaProfileService raProfileService;
 
     @Autowired
     private ApprovalProfileExternalService approvalProfileService;

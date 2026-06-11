@@ -121,7 +121,7 @@ class CrlInsertVsValidateTest extends BaseSpringBootTest {
         assertNull(err1.get(), "race worker 1 must not throw: " + err1.get());
         assertNull(err2.get(), "race worker 2 must not throw: " + err2.get());
 
-        List<com.otilm.core.dao.entity.Crl> rows = crlRepository.findAll();
+        List<Crl> rows = crlRepository.findAll();
         long matchingRows = rows.stream()
                 .filter(c -> issuerDn.equals(c.getIssuerDn()) && issuerSerial.equals(c.getSerialNumber()))
                 .count();

@@ -6,6 +6,7 @@ import com.otilm.api.model.core.logging.enums.Module;
 import com.otilm.api.model.core.logging.records.LogRecord;
 import com.otilm.api.model.core.logging.records.ResourceObjectIdentity;
 import com.otilm.core.dao.entity.*;
+import com.otilm.core.dao.entity.AuditLog;
 import com.otilm.core.dao.repository.AuditLogRepository;
 import db.migration.V202509191412__LogRecordsRefactor;
 import org.flywaydb.core.api.migration.Context;

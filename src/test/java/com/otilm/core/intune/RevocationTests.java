@@ -33,7 +33,6 @@ package com.otilm.core.intune;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.otilm.core.intune.scepvalidation.*;
-
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
@@ -48,6 +47,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.otilm.core.intune.scepvalidation.IntuneRevocationClient;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;

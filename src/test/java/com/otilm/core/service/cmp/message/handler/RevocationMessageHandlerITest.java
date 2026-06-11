@@ -23,7 +23,6 @@ import com.otilm.core.util.BaseSpringBootTest;
 import com.otilm.core.util.CertificateUtil;
 import com.otilm.core.util.MetaDefinitions;
 import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.client.WireMock;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.cmp.*;
 import org.junit.jupiter.api.AfterEach;

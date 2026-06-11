@@ -43,6 +43,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.otilm.core.util.AuthHelper;
+import com.otilm.core.util.BaseSpringBootTest;
+import com.otilm.core.util.SecretEncodingVersion;
+import com.otilm.core.util.SecretsUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +60,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.util.SerializationUtils;
 
 import java.io.Serializable;
 import java.security.NoSuchAlgorithmException;

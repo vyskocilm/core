@@ -46,6 +46,10 @@ import java.util.UUID;
 
 import javax.naming.ServiceUnavailableException;
 
+import com.otilm.core.intune.scepvalidation.IntuneClientHttpErrorException;
+import com.otilm.core.intune.scepvalidation.IntuneScepServiceClient;
+import com.otilm.core.intune.scepvalidation.IntuneScepServiceException;
+import com.otilm.core.intune.scepvalidation.IntuneServiceNotFoundException;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.mockito.ArgumentMatcher;
 import org.mockito.ArgumentMatchers;
@@ -91,7 +95,7 @@ public class Test
     }
 
     @org.junit.jupiter.api.Test
-    public void TestErrorThrows() throws IntuneScepServiceException, Exception 
+    public void TestErrorThrows() throws IntuneScepServiceException, Exception
     {
         Helper helper = new Helper();
         

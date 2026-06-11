@@ -49,12 +49,12 @@ public class ObjectFilterAspect {
         this.opaSecuredAnnotationMetadataExtractor = opaSecuredAnnotationMetadataExtractor;
     }
 
-    @Around("@annotation(ExternalAuthorizationDynamic)")
+    @Around("@annotation(com.otilm.core.security.authz.ExternalAuthorizationDynamic)")
     public Object obtainObjectAccessDataDynamic(ProceedingJoinPoint joinPoint) throws Throwable {
         return filterObjectsAndProceed(joinPoint, "dynamic ", this::createAttributesFromDynamicAnnotation);
     }
 
-    @Around("@annotation(ExternalAuthorization)")
+    @Around("@annotation(com.otilm.core.security.authz.ExternalAuthorization)")
     public Object obtainObjectAccessData(ProceedingJoinPoint joinPoint) throws Throwable {
         return filterObjectsAndProceed(joinPoint, "", this::createAttributesFromAnnotation);
     }

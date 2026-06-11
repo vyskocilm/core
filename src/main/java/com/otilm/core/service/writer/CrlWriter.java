@@ -3,6 +3,7 @@ package com.otilm.core.service.writer;
 import com.otilm.core.dao.entity.Crl;
 import com.otilm.core.dao.repository.CrlEntryRepository;
 import com.otilm.core.dao.repository.CrlRepository;
+import com.otilm.core.service.CrlService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +18,7 @@ import java.util.UUID;
  * <p>Methods use the default propagation ({@code REQUIRED}) — they join an ambient transaction if one is active,
  * or open a new one if no ambient transaction exists.
  *
- * @see com.otilm.core.service.CrlService
+ * @see CrlService
  */
 @Service
 public class CrlWriter {

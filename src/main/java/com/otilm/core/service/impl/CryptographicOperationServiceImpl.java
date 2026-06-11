@@ -15,6 +15,9 @@ import com.otilm.api.model.core.cryptography.key.KeyEventStatus;
 import com.otilm.api.model.core.cryptography.key.KeyState;
 import com.otilm.api.model.core.cryptography.key.KeyUsage;
 import com.otilm.core.attribute.*;
+import com.otilm.core.attribute.EcdsaSignatureAttributes;
+import com.otilm.core.attribute.RsaEncryptionAttributes;
+import com.otilm.core.attribute.RsaSignatureAttributes;
 import com.otilm.core.client.ConnectorApiFactory;
 import com.otilm.core.config.TokenContentSigner;
 import com.otilm.core.dao.entity.CryptographicKey;
@@ -298,7 +301,7 @@ public class CryptographicOperationServiceImpl implements CryptographicOperation
         com.otilm.api.model.connector.cryptography.operations.SignDataRequestDto requestDto = new com.otilm.api.model.connector.cryptography.operations.SignDataRequestDto();
         requestDto.setSignatureAttributes(request.getSignatureAttributes());
         requestDto.setData(request.getData().stream().map(e -> {
-            com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData signatureRequestData = new com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData();
+                    com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData signatureRequestData = new com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData();
                     signatureRequestData.setData(base64EncodedToByteArray(e.getData()));
                     signatureRequestData.setIdentifier(e.getIdentifier());
                     return signatureRequestData;
@@ -347,14 +350,14 @@ public class CryptographicOperationServiceImpl implements CryptographicOperation
         com.otilm.api.model.connector.cryptography.operations.VerifyDataRequestDto requestDto = new com.otilm.api.model.connector.cryptography.operations.VerifyDataRequestDto();
         requestDto.setSignatureAttributes(request.getSignatureAttributes());
         if (request.getData() != null) requestDto.setData(request.getData().stream().map(e -> {
-            com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData signatureRequestData = new com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData();
+                    com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData signatureRequestData = new com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData();
                     signatureRequestData.setData(base64EncodedToByteArray(e.getData()));
                     signatureRequestData.setIdentifier(e.getIdentifier());
                     return signatureRequestData;
                 }).toList()
         );
         requestDto.setSignatures(request.getSignatures().stream().map(e -> {
-            com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData signatureRequestData = new com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData();
+                    com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData signatureRequestData = new com.otilm.api.model.connector.cryptography.operations.data.SignatureRequestData();
                     signatureRequestData.setData(base64EncodedToByteArray(e.getData()));
                     signatureRequestData.setIdentifier(e.getIdentifier());
                     return signatureRequestData;
