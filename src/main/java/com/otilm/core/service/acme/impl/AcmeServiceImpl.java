@@ -38,7 +38,6 @@ import com.otilm.core.util.*;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSObject;
 import com.nimbusds.jose.util.Base64URL;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import jakarta.transaction.Transactional;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.style.BCStyle;

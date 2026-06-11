@@ -9,7 +9,6 @@ import com.otilm.core.attribute.engine.AttributeEngine;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import org.flywaydb.core.api.migration.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

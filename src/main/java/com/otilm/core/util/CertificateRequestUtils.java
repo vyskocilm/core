@@ -8,7 +8,6 @@ import com.otilm.core.attribute.CsrAttributes;
 import com.otilm.core.model.request.CertificateRequest;
 import com.otilm.core.model.request.CrmfCertificateRequest;
 import com.otilm.core.model.request.Pkcs10CertificateRequest;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;

@@ -10,7 +10,6 @@ import com.otilm.api.model.common.enums.cryptography.RsaSignatureScheme;
 import com.otilm.api.model.common.enums.cryptography.KeyAlgorithm;
 import com.otilm.core.attribute.EcdsaSignatureAttributes;
 import com.otilm.core.attribute.RsaSignatureAttributes;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;

@@ -5,7 +5,6 @@ import com.otilm.api.exception.AttributeException;
 import com.otilm.api.exception.ConnectorException;
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.model.client.attribute.RequestAttribute;
-import com.otilm.api.model.client.attribute.RequestAttribute;
 import com.otilm.api.model.client.certificate.EntityInstanceResponseDto;
 import com.otilm.api.model.client.certificate.SearchRequestDto;
 import com.otilm.api.model.client.entity.EntityInstanceUpdateRequestDto;

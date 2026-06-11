@@ -54,7 +54,6 @@ import com.otilm.core.service.*;
 import com.otilm.core.service.handler.CertificateHandler;
 import com.otilm.core.tasks.ScheduledJobInfo;
 import com.otilm.core.util.*;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;

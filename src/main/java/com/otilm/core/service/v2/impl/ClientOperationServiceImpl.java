@@ -58,7 +58,6 @@ import com.otilm.core.service.v2.ClientOperationService;
 import com.otilm.core.service.v2.ConnectorService;
 import com.otilm.core.service.v2.ExtendedAttributeService;
 import com.otilm.core.util.*;
-import com.otilm.core.util.AttributeDefinitionUtils;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
 import org.slf4j.Logger;
