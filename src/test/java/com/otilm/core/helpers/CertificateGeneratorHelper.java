@@ -276,7 +276,7 @@ public class CertificateGeneratorHelper {
         // Sign the OCSP response
         ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").setProvider("BC").build(issuerKey);
 
-        X509CertificateHolder[] chain = {new JcaX509CertificateHolder(issuerCert)};
+        X509CertificateHolder[] chain = { new JcaX509CertificateHolder(issuerCert) };
         BasicOCSPResp basicResp = respBuilder.build(signer, chain, new Date());
 
         // Wrap in OCSPResp
