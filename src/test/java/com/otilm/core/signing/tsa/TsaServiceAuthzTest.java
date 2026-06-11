@@ -24,8 +24,8 @@ import com.otilm.core.security.authz.opa.dto.OpaResourceAccessResult;
 import com.otilm.core.signing.tsa.messages.TspResponse;
 import com.otilm.core.signing.tsa.resolver.SigningProfileResolverFactory;
 import com.otilm.core.util.BaseSpringBootTest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -34,8 +34,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.List;
 
 import static com.otilm.core.signing.tsa.messages.TspRequestBuilder.aTspRequest;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -132,115 +133,150 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
                 && req.getObjectUUIDs().contains(uuid.toString());
     }
 
-    // ── Tests ───────────────────────────────────────────────────────────────
+    // ── ProcessTspRequestForTspProfile ────────────────────────────────────────
 
-    @Test
-    void authorizesObjectLevel_withTspProfileUuid_andTspSignAction() throws Exception {
-        SigningProfile signingProfile = createTimestampingSigningProfile("sp-authz", true);
-        TspProfile tspProfile = createTspProfileFor("tsp-authz", true, signingProfile);
+    @Nested
+    class ProcessTspRequestForTspProfile {
 
-        tsaService.processTspRequestForTspProfile("tsp-authz", aTspRequest().build());
+        @Test
+        void authorizesObjectLevel_withTspProfileUuid_andTspSignAction() throws Exception {
+            // given
+            SigningProfile signingProfile = createTimestampingSigningProfile("sp-authz", true);
+            TspProfile tspProfile = createTspProfileFor("tsp-authz", true, signingProfile);
 
-        verify(opaClient, atLeastOnce()).checkResourceAccess(
-                any(),
-                org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, tspProfile.getUuid())),
-                any(), any());
-        verify(managedTimestampEngine).process(any(), any());
+            // when
+            tsaService.processTspRequestForTspProfile("tsp-authz", aTspRequest().build());
+
+            // then
+            verify(opaClient, atLeastOnce()).checkResourceAccess(
+                    any(),
+                    org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, tspProfile.getUuid())),
+                    any(), any());
+            verify(managedTimestampEngine).process(any(), any());
+        }
+
+        @Test
+        void deniesObjectLevel_whenNotAuthorizedForThatTspProfile() {
+            // given
+            SigningProfile signingProfileA = createTimestampingSigningProfile("sp-a", true);
+            SigningProfile signingProfileB = createTimestampingSigningProfile("sp-b", true);
+            TspProfile tspProfileA = createTspProfileFor("tsp-a", true, signingProfileA);
+            createTspProfileFor("tsp-b", true, signingProfileB);
+
+            denyTspSignForObject(tspProfileA.getUuid());
+
+            // when / then
+            assertThatThrownBy(() -> tsaService.processTspRequestForTspProfile("tsp-a", aTspRequest().build()))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        void rejectsDisabledTspProfile_withBadRequest() {
+            // given
+            SigningProfile signingProfile = createTimestampingSigningProfile("sp-for-disabled-tsp", true);
+            createTspProfileFor("disabled-tsp", false, signingProfile);
+
+            // when / then
+            assertThatThrownBy(() -> tsaService.processTspRequestForTspProfile("disabled-tsp", aTspRequest().build()))
+                    .isInstanceOf(TspException.class)
+                    .satisfies(ex -> {
+                        assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST);
+                        assertThat(((TspException) ex).getClientMessage()).contains("not enabled");
+                    });
+        }
+
+        @Test
+        void rejectsDisabledSigningProfile_withBadRequest() {
+            // given
+            SigningProfile disabledSigningProfile = createTimestampingSigningProfile("disabled-sp", false);
+            createTspProfileFor("tsp-with-disabled-sp", true, disabledSigningProfile);
+
+            // when / then
+            assertThatThrownBy(() -> tsaService.processTspRequestForTspProfile("tsp-with-disabled-sp", aTspRequest().build()))
+                    .isInstanceOf(TspException.class)
+                    .satisfies(ex -> {
+                        assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST);
+                        assertThat(((TspException) ex).getClientMessage()).contains("not enabled");
+                    });
+        }
+
+        @Test
+        void succeeds_whenBothProfilesEnabled_andAuthorized() throws Exception {
+            // given
+            SigningProfile signingProfile = createTimestampingSigningProfile("sp-ok", true);
+            createTspProfileFor("tsp-ok", true, signingProfile);
+
+            // when
+            TspResponse response = tsaService.processTspRequestForTspProfile("tsp-ok", aTspRequest().build());
+
+            // then
+            assertThat(response).isInstanceOf(TspResponse.Granted.class);
+            verify(managedTimestampEngine).process(any(), any());
+        }
     }
 
-    @Test
-    void deniesObjectLevel_whenNotAuthorizedForThatTspProfile() {
-        SigningProfile signingProfileA = createTimestampingSigningProfile("sp-a", true);
-        SigningProfile signingProfileB = createTimestampingSigningProfile("sp-b", true);
-        TspProfile tspProfileA = createTspProfileFor("tsp-a", true, signingProfileA);
-        createTspProfileFor("tsp-b", true, signingProfileB);
+    // ── ProcessTspRequestForSigningProfile ────────────────────────────────────
 
-        denyTspSignForObject(tspProfileA.getUuid());
+    @Nested
+    class ProcessTspRequestForSigningProfile {
 
-        Assertions.assertThrows(AccessDeniedException.class,
-                () -> tsaService.processTspRequestForTspProfile("tsp-a", aTspRequest().build()));
-    }
+        @Test
+        void authorizesAgainstLinkedTspProfileUuid_andTspSignAction() throws Exception {
+            // given
+            SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-authz", true);
+            TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-authz", true, signingProfile);
+            linkTspProfile(signingProfile, linkedTspProfile);
 
-    @Test
-    void rejectsDisabledTspProfile_withBadRequest() {
-        SigningProfile signingProfile = createTimestampingSigningProfile("sp-for-disabled-tsp", true);
-        createTspProfileFor("disabled-tsp", false, signingProfile);
+            // when
+            tsaService.processTspRequestForSigningProfile("sp-indirect-authz", aTspRequest().build());
 
-        TspException ex = Assertions.assertThrows(TspException.class,
-                () -> tsaService.processTspRequestForTspProfile("disabled-tsp", aTspRequest().build()));
-        Assertions.assertEquals(TspFailureInfo.BAD_REQUEST, ex.getFailureInfo());
-        Assertions.assertTrue(ex.getClientMessage().contains("not enabled"));
-    }
+            // then
+            verify(opaClient, atLeastOnce()).checkResourceAccess(
+                    any(),
+                    org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, linkedTspProfile.getUuid())),
+                    any(), any());
+            verify(managedTimestampEngine).process(any(), any());
+        }
 
-    @Test
-    void rejectsDisabledSigningProfile_withBadRequest() {
-        SigningProfile disabledSigningProfile = createTimestampingSigningProfile("disabled-sp", false);
-        createTspProfileFor("tsp-with-disabled-sp", true, disabledSigningProfile);
+        @Test
+        void deniesObjectLevel_whenNotAuthorizedForLinkedTspProfile() {
+            // given
+            SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-denied", true);
+            TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-denied", true, signingProfile);
+            linkTspProfile(signingProfile, linkedTspProfile);
 
-        TspException ex = Assertions.assertThrows(TspException.class,
-                () -> tsaService.processTspRequestForTspProfile("tsp-with-disabled-sp", aTspRequest().build()));
-        Assertions.assertEquals(TspFailureInfo.BAD_REQUEST, ex.getFailureInfo());
-        Assertions.assertTrue(ex.getClientMessage().contains("not enabled"));
-    }
+            denyTspSignForObject(linkedTspProfile.getUuid());
 
-    @Test
-    void succeeds_whenBothProfilesEnabled_andAuthorized() throws Exception {
-        SigningProfile signingProfile = createTimestampingSigningProfile("sp-ok", true);
-        createTspProfileFor("tsp-ok", true, signingProfile);
+            // when / then
+            assertThatThrownBy(() -> tsaService.processTspRequestForSigningProfile("sp-indirect-denied", aTspRequest().build()))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
 
-        TspResponse response = tsaService.processTspRequestForTspProfile("tsp-ok", aTspRequest().build());
+        @Test
+        void rejectsDisabledLinkedTspProfile_withBadRequest() {
+            // given
+            SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-disabled-tsp", true);
+            TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-disabled", false, signingProfile);
+            linkTspProfile(signingProfile, linkedTspProfile);
 
-        Assertions.assertTrue(response instanceof TspResponse.Granted);
-        verify(managedTimestampEngine).process(any(), any());
-    }
+            // when / then
+            assertThatThrownBy(() -> tsaService.processTspRequestForSigningProfile("sp-indirect-disabled-tsp", aTspRequest().build()))
+                    .isInstanceOf(TspException.class)
+                    .satisfies(ex -> {
+                        assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST);
+                        assertThat(((TspException) ex).getClientMessage()).contains("not enabled");
+                    });
+        }
 
-    // ── Indirect signing-profile route (/signingProfiles/{name}/sign) ─────────
+        @Test
+        void rejectsSigningProfileWithNoLinkedTspProfile_withBadRequest() {
+            // given
+            createTimestampingSigningProfile("sp-indirect-unlinked", true);
 
-    @Test
-    void indirectRoute_authorizesAgainstLinkedTspProfileUuid_andTspSignAction() throws Exception {
-        SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-authz", true);
-        TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-authz", true, signingProfile);
-        linkTspProfile(signingProfile, linkedTspProfile);
-
-        tsaService.processTspRequestForSigningProfile("sp-indirect-authz", aTspRequest().build());
-
-        verify(opaClient, atLeastOnce()).checkResourceAccess(
-                any(),
-                org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, linkedTspProfile.getUuid())),
-                any(), any());
-        verify(managedTimestampEngine).process(any(), any());
-    }
-
-    @Test
-    void indirectRoute_deniesObjectLevel_whenNotAuthorizedForLinkedTspProfile() {
-        SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-denied", true);
-        TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-denied", true, signingProfile);
-        linkTspProfile(signingProfile, linkedTspProfile);
-
-        denyTspSignForObject(linkedTspProfile.getUuid());
-
-        Assertions.assertThrows(AccessDeniedException.class,
-                () -> tsaService.processTspRequestForSigningProfile("sp-indirect-denied", aTspRequest().build()));
-    }
-
-    @Test
-    void indirectRoute_rejectsDisabledLinkedTspProfile_withBadRequest() {
-        SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-disabled-tsp", true);
-        TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-disabled", false, signingProfile);
-        linkTspProfile(signingProfile, linkedTspProfile);
-
-        TspException ex = Assertions.assertThrows(TspException.class,
-                () -> tsaService.processTspRequestForSigningProfile("sp-indirect-disabled-tsp", aTspRequest().build()));
-        Assertions.assertEquals(TspFailureInfo.BAD_REQUEST, ex.getFailureInfo());
-        Assertions.assertTrue(ex.getClientMessage().contains("not enabled"));
-    }
-
-    @Test
-    void indirectRoute_rejectsSigningProfileWithNoLinkedTspProfile_withBadRequest() {
-        createTimestampingSigningProfile("sp-indirect-unlinked", true);
-
-        TspException ex = Assertions.assertThrows(TspException.class,
-                () -> tsaService.processTspRequestForSigningProfile("sp-indirect-unlinked", aTspRequest().build()));
-        Assertions.assertEquals(TspFailureInfo.BAD_REQUEST, ex.getFailureInfo());
+            // when / then
+            assertThatThrownBy(() -> tsaService.processTspRequestForSigningProfile("sp-indirect-unlinked", aTspRequest().build()))
+                    .isInstanceOf(TspException.class)
+                    .satisfies(ex -> assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST));
+        }
     }
 }

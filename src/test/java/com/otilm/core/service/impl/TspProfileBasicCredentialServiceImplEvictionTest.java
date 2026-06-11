@@ -36,7 +36,7 @@ class TspProfileBasicCredentialServiceImplEvictionTest {
     private UUID secretUuid;
 
     @BeforeEach
-    void setUp() {
+    void wireService() {
         service = new TspProfileBasicCredentialServiceImpl();
         service.setCredentialRepository(credentialRepository);
         service.setCacheEvictor(cacheEvictor);
@@ -45,25 +45,31 @@ class TspProfileBasicCredentialServiceImplEvictionTest {
     }
 
     @Test
-    void evictsProfileAndVerificationCachesWhenCredentialFound() {
+    void evictsProfileAndVerificationCaches_whenCredentialFound() {
+        // given
         TspProfile profile = new TspProfile();
         profile.setName("p1");
         TspProfileBasicCredential credential = new TspProfileBasicCredential();
         credential.setTspProfile(profile);
         when(credentialRepository.findBySecretUuid(secretUuid)).thenReturn(Optional.of(credential));
 
+        // when
         service.evictCachesForSecret(secretUuid);
 
+        // then
         verify(cacheEvictor).evict(CacheConfig.TSP_PROFILE_CACHE, "p1");
         verify(credentialVerificationCache).evictBySecretUuid(secretUuid);
     }
 
     @Test
-    void noOpWhenSecretIsNotTspBasicCredential() {
+    void doesNothing_whenSecretIsNotTspBasicCredential() {
+        // given — no TSP basic credential references this secret
         when(credentialRepository.findBySecretUuid(secretUuid)).thenReturn(Optional.empty());
 
+        // when
         service.evictCachesForSecret(secretUuid);
 
+        // then
         verifyNoInteractions(cacheEvictor);
         verifyNoInteractions(credentialVerificationCache);
     }

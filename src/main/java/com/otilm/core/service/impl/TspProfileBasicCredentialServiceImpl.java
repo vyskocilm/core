@@ -149,6 +149,16 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void deleteSecretsForProfile(UUID tspProfileUuid) {
+        for (TspProfileBasicCredential credential : credentialRepository.findByTspProfileUuid(tspProfileUuid)) {
+            UUID secretUuid = credential.getSecretUuid();
+            deleteVaultSecret(secretUuid);
+            credentialVerificationCache.evictBySecretUuid(secretUuid);
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public void evictCachesForSecret(UUID secretUuid) {
         credentialRepository.findBySecretUuid(secretUuid).ifPresent(credential -> {

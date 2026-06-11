@@ -41,7 +41,7 @@ class ProtocolValidationFilterTest {
     private AuthHelper authHelper;
 
     @BeforeEach
-    void setUp() {
+    void createFilter() {
         filter = new ProtocolValidationFilter();
         filter.setAuthHelper(authHelper);
         filter.setHandlerExceptionResolver(resolver);
@@ -49,12 +49,15 @@ class ProtocolValidationFilterTest {
     }
 
     @Test
-    void tspRequestPassesThroughWithoutSystemUserAuthOrRejection() throws Exception {
+    void passesThrough_whenTspRequest_withoutSystemUserAuthOrRejection() throws Exception {
+        // given
         MockHttpServletRequest request = new MockHttpServletRequest("POST", CONTEXT + "/v1/protocols/tsp/some-profile/sign");
         request.setContent(new byte[0]);
 
+        // when
         filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
+        // then
         verify(filterChain, times(1)).doFilter(any(), any());
         verify(resolver, never()).resolveException(any(), any(), any(), any());
         // The dedicated TSP chain owns authentication; this filter must not overwrite the principal.
@@ -62,12 +65,15 @@ class ProtocolValidationFilterTest {
     }
 
     @Test
-    void unknownProtocolIsRejectedWithValidationException() throws Exception {
+    void rejects_whenUnknownProtocol_withValidationException() throws Exception {
+        // given
         MockHttpServletRequest request = new MockHttpServletRequest("POST", CONTEXT + "/v1/protocols/unknown/foo");
         request.setContent(new byte[0]);
 
+        // when
         filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
+        // then
         verify(resolver, times(1)).resolveException(any(), any(), any(), any(ValidationException.class));
         verify(filterChain, never()).doFilter(any(), any());
     }

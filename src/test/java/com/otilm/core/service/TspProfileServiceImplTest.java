@@ -24,12 +24,15 @@ import com.otilm.core.dao.entity.AttributeRelation;
 import com.otilm.core.dao.entity.VaultInstance;
 import com.otilm.core.dao.entity.VaultProfile;
 import com.otilm.core.dao.entity.signing.TspProfile;
+import com.otilm.core.dao.entity.signing.TspProfileBasicCredential;
 import com.otilm.core.dao.repository.AttributeDefinitionRepository;
 import com.otilm.core.dao.repository.AttributeRelationRepository;
 import com.otilm.core.dao.repository.VaultInstanceRepository;
 import com.otilm.core.dao.repository.VaultProfileRepository;
+import com.otilm.core.dao.repository.signing.TspProfileBasicCredentialRepository;
 import com.otilm.core.dao.repository.signing.TspProfileRepository;
 import com.otilm.core.model.signing.TspProfileModel;
+import com.otilm.core.security.authn.client.CredentialVerificationCache;
 import com.otilm.core.security.authz.SecuredUUID;
 import com.otilm.core.security.authz.SecurityFilter;
 import com.otilm.core.util.BaseSpringBootTest;
@@ -38,11 +41,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class TspProfileServiceImplTest extends BaseSpringBootTest {
 
@@ -72,6 +82,15 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Autowired
     private VaultInstanceRepository vaultInstanceRepository;
+
+    @Autowired
+    private TspProfileBasicCredentialRepository basicCredentialRepository;
+
+    @MockitoBean
+    private SecretService secretService;
+
+    @MockitoBean
+    private CredentialVerificationCache credentialVerificationCache;
 
     private TspProfile savedTspProfile;
 
@@ -110,6 +129,17 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         attributeRelation.setResource(Resource.TSP_PROFILE);
         attributeRelation.setAttributeDefinitionUuid(attributeDefinition.getUuid());
         attributeRelationRepository.save(attributeRelation);
+
+        when(secretService.getLatestFingerprintsByUuid(any())).thenReturn(Map.of());
+    }
+
+    private TspProfileBasicCredential persistBasicCredential(TspProfile profile, String username, UUID secretUuid) {
+        TspProfileBasicCredential credential = new TspProfileBasicCredential();
+        credential.setTspProfile(profile);
+        credential.setUsername(username);
+        credential.setSecretUuid(secretUuid);
+        credential.setMappedUserUuid(UUID.randomUUID());
+        return basicCredentialRepository.save(credential);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -294,6 +324,35 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         Assertions.assertThrows(NotFoundException.class,
                 () -> tspService.deleteTspProfile(
                         SecuredUUID.fromString("00000000-0000-0000-0000-000000000001")));
+    }
+
+    @Test
+    void testDeleteTspProfile_deletesAssociatedBasicCredentialSecrets() throws Exception {
+        UUID secretUuid = UUID.randomUUID();
+        persistBasicCredential(savedTspProfile, "svc-account", secretUuid);
+
+        tspService.deleteTspProfile(savedTspProfile.getSecuredUuid());
+
+        verify(secretService, times(1)).deleteSecret(secretUuid, true);
+        verify(credentialVerificationCache, times(1)).evictBySecretUuid(secretUuid);
+        Assertions.assertTrue(basicCredentialRepository.findByTspProfileUuid(savedTspProfile.getUuid()).isEmpty(),
+                "Basic credential rows must be removed when the TSP profile is deleted");
+        Assertions.assertFalse(tspRepository.findById(savedTspProfile.getUuid()).isPresent());
+    }
+
+    @Test
+    void testDeleteTspProfile_deletesSecretsForAllBasicCredentials() throws Exception {
+        UUID firstSecret = UUID.randomUUID();
+        UUID secondSecret = UUID.randomUUID();
+        persistBasicCredential(savedTspProfile, "svc-one", firstSecret);
+        persistBasicCredential(savedTspProfile, "svc-two", secondSecret);
+
+        tspService.deleteTspProfile(savedTspProfile.getSecuredUuid());
+
+        verify(secretService, times(1)).deleteSecret(firstSecret, true);
+        verify(secretService, times(1)).deleteSecret(secondSecret, true);
+        Assertions.assertTrue(basicCredentialRepository.findByTspProfileUuid(savedTspProfile.getUuid()).isEmpty());
+        Assertions.assertFalse(tspRepository.findById(savedTspProfile.getUuid()).isPresent());
     }
 
     // ──────────────────────────────────────────────────────────────────────────

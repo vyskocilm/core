@@ -1,12 +1,13 @@
 package com.otilm.core.security.authn.client;
 
 import com.otilm.core.util.BaseSpringBootTest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Optional;
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CredentialVerificationCacheTest extends BaseSpringBootTest {
 
@@ -14,23 +15,32 @@ class CredentialVerificationCacheTest extends BaseSpringBootTest {
     private CredentialVerificationCache cache;
 
     @Test
-    void positiveHitReturnsMappedUser_andEvictionBySecretClears() {
+    void returnsMappedUserOnHit_andEvictionBySecretClearsIt() {
+        // given
         UUID secret = UUID.randomUUID();
         UUID mappedUser = UUID.randomUUID();
+        assertThat(cache.getMappedUser(secret, "pw")).isEmpty();
 
-        Assertions.assertTrue(cache.getMappedUser(secret, "pw").isEmpty());
-
+        // when
         cache.putSuccess(secret, "pw", mappedUser);
-        Assertions.assertEquals(Optional.of(mappedUser), cache.getMappedUser(secret, "pw"));
 
+        // then
+        assertThat(cache.getMappedUser(secret, "pw")).isEqualTo(Optional.of(mappedUser));
+
+        // when — the secret is evicted
         cache.evictBySecretUuid(secret);
-        Assertions.assertTrue(cache.getMappedUser(secret, "pw").isEmpty());
+
+        // then
+        assertThat(cache.getMappedUser(secret, "pw")).isEmpty();
     }
 
     @Test
-    void wrongPasswordDoesNotHit() {
+    void returnsEmpty_whenPasswordWrong() {
+        // given
         UUID secret = UUID.randomUUID();
         cache.putSuccess(secret, "right", UUID.randomUUID());
-        Assertions.assertTrue(cache.getMappedUser(secret, "wrong").isEmpty());
+
+        // when / then
+        assertThat(cache.getMappedUser(secret, "wrong")).isEmpty();
     }
 }

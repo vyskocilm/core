@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,7 +42,7 @@ class TsaServiceImplLinkageTest {
         assertThatThrownBy(() -> TsaServiceImpl.assertLinkedToTspProfile(
                 signingProfileLinkedTo(UUID.randomUUID()), tspProfile(UUID.randomUUID())))
                 .isInstanceOf(TspException.class)
-                .satisfies(ex -> org.assertj.core.api.Assertions.assertThat(((TspException) ex).getFailureInfo())
+                .satisfies(ex -> assertThat(((TspException) ex).getFailureInfo())
                         .isEqualTo(TspFailureInfo.BAD_REQUEST));
     }
 
