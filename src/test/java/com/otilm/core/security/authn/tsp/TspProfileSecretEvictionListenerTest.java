@@ -1,0 +1,32 @@
+package com.otilm.core.security.authn.tsp;
+
+import com.otilm.core.events.SecretContentUpdatedEvent;
+import com.otilm.core.service.TspProfileBasicCredentialService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.UUID;
+
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class TspProfileSecretEvictionListenerTest {
+
+    @Mock
+    private TspProfileBasicCredentialService credentialService;
+
+    @InjectMocks
+    private TspProfileSecretEvictionListener listener;
+
+    @Test
+    void delegatesEvictionToCredentialService() {
+        UUID secretUuid = UUID.randomUUID();
+
+        listener.onSecretContentUpdated(new SecretContentUpdatedEvent(secretUuid));
+
+        verify(credentialService).evictCachesForSecret(secretUuid);
+    }
+}

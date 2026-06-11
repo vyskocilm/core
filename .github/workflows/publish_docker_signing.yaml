@@ -5,7 +5,7 @@ name: Publish signing Docker image
 #   signing-latest          – mutable, always the most recent commit
 #   signing-<short-sha>     – immutable, use this in K8s manifests/Helm values
 #
-# DEPENDENCY: com.czertainly:interfaces:2.17.0-signing-SNAPSHOT must already be published
+# DEPENDENCY: com.otilm:interfaces:2.17.0-signing-SNAPSHOT must already be published
 # to GitHub Packages by the CZERTAINLY-Interfaces feat/signing workflow before
 # this workflow runs.
 
