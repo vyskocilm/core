@@ -1,5 +1,8 @@
 package com.otilm.core.api.web;
 
+import com.otilm.api.exception.AlreadyExistException;
+import com.otilm.api.exception.AttributeException;
+import com.otilm.api.exception.ConnectorCommunicationException;
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.interfaces.core.web.TspProfileBasicCredentialController;
 import com.otilm.api.model.client.signing.protocols.tsp.TspBasicCredentialDto;
@@ -43,19 +46,19 @@ public class TspProfileBasicCredentialControllerImpl implements TspProfileBasicC
 
     @Override
     @AuditLogged(module = Module.SIGNING, resource = Resource.TSP_PROFILE_BASIC_CREDENTIAL, affiliatedResource = Resource.TSP_PROFILE, operation = Operation.CREATE)
-    public TspBasicCredentialDto create(@LogResource(uuid = true, affiliated = true) UUID tspProfileUuid, @Valid TspBasicCredentialRequestDto request) throws NotFoundException {
+    public TspBasicCredentialDto create(@LogResource(uuid = true, affiliated = true) UUID tspProfileUuid, @Valid TspBasicCredentialRequestDto request) throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException {
         return service.create(SecuredParentUUID.fromUUID(tspProfileUuid), request);
     }
 
     @Override
     @AuditLogged(module = Module.SIGNING, resource = Resource.TSP_PROFILE_BASIC_CREDENTIAL, affiliatedResource = Resource.TSP_PROFILE, operation = Operation.UPDATE)
-    public TspBasicCredentialDto update(@LogResource(uuid = true, affiliated = true) UUID tspProfileUuid, @LogResource(uuid = true) UUID uuid, @Valid TspBasicCredentialRequestDto request) throws NotFoundException {
+    public TspBasicCredentialDto update(@LogResource(uuid = true, affiliated = true) UUID tspProfileUuid, @LogResource(uuid = true) UUID uuid, @Valid TspBasicCredentialRequestDto request) throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException {
         return service.update(SecuredParentUUID.fromUUID(tspProfileUuid), SecuredUUID.fromUUID(uuid), request);
     }
 
     @Override
     @AuditLogged(module = Module.SIGNING, resource = Resource.TSP_PROFILE_BASIC_CREDENTIAL, affiliatedResource = Resource.TSP_PROFILE, operation = Operation.DELETE)
-    public void delete(@LogResource(uuid = true, affiliated = true) UUID tspProfileUuid, @LogResource(uuid = true) UUID uuid) throws NotFoundException {
+    public void delete(@LogResource(uuid = true, affiliated = true) UUID tspProfileUuid, @LogResource(uuid = true) UUID uuid) throws AttributeException, ConnectorCommunicationException, NotFoundException {
         service.delete(SecuredParentUUID.fromUUID(tspProfileUuid), SecuredUUID.fromUUID(uuid));
     }
 }

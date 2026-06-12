@@ -61,6 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -161,7 +162,7 @@ public class TspProfileServiceImpl implements TspProfileService {
     private Map<UUID, String> loadLatestFingerprints(TspProfile profile) {
         List<UUID> secretUuids = profile.getBasicCredentials().stream()
                 .map(TspProfileBasicCredential::getSecretUuid)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
         return secretService.getLatestFingerprintsByUuid(secretUuids);
     }
@@ -191,6 +192,7 @@ public class TspProfileServiceImpl implements TspProfileService {
         }
 
         ValidatedReferences refs = validateCreateUpdateRequest(request);
+        guardAgainstOrphaningBasicCredentials(profile, request);
         evictTspProfileCache(oldName);
         if (!oldName.equals(request.getName())) {
             evictTspProfileCache(request.getName());
@@ -362,6 +364,16 @@ public class TspProfileServiceImpl implements TspProfileService {
         }
 
         return new ValidatedReferences(defaultSigningProfile, vaultProfile);
+    }
+
+    private void guardAgainstOrphaningBasicCredentials(TspProfile profile, TspProfileRequestDto request) {
+        if (profile.getBasicCredentials().isEmpty()) {
+            return;
+        }
+        // Removing BASIC_PASSWORD is allowed: credentials are retained (hidden) and become usable again if the method is re-added.
+        if (!Objects.equals(profile.getVaultProfileUuid(), request.getVaultProfileUuid())) {
+            throw new ValidationException("Cannot change or remove the vault profile while Basic credentials exist on this TSP profile. Delete the credentials first.");
+        }
     }
 
     private TspProfileDto updateAndMapToDto(TspProfile profile, TspProfileRequestDto request, ValidatedReferences refs) throws AlreadyExistException, AttributeException, NotFoundException {

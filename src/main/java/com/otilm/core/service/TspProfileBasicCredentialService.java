@@ -1,5 +1,8 @@
 package com.otilm.core.service;
 
+import com.otilm.api.exception.AlreadyExistException;
+import com.otilm.api.exception.AttributeException;
+import com.otilm.api.exception.ConnectorCommunicationException;
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.model.client.signing.protocols.tsp.TspBasicCredentialDto;
 import com.otilm.api.model.client.signing.protocols.tsp.TspBasicCredentialRequestDto;
@@ -15,11 +18,11 @@ public interface TspProfileBasicCredentialService {
 
     TspBasicCredentialDto get(SecuredParentUUID tspProfileUuid, SecuredUUID uuid) throws NotFoundException;
 
-    TspBasicCredentialDto create(SecuredParentUUID tspProfileUuid, TspBasicCredentialRequestDto request) throws NotFoundException;
+    TspBasicCredentialDto create(SecuredParentUUID tspProfileUuid, TspBasicCredentialRequestDto request) throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException;
 
-    TspBasicCredentialDto update(SecuredParentUUID tspProfileUuid, SecuredUUID uuid, TspBasicCredentialRequestDto request) throws NotFoundException;
+    TspBasicCredentialDto update(SecuredParentUUID tspProfileUuid, SecuredUUID uuid, TspBasicCredentialRequestDto request) throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException;
 
-    void delete(SecuredParentUUID tspProfileUuid, SecuredUUID uuid) throws NotFoundException;
+    void delete(SecuredParentUUID tspProfileUuid, SecuredUUID uuid) throws AttributeException, ConnectorCommunicationException, NotFoundException;
 
     /**
      * Evict the TSP profile model cache and credential-verification cache for the secret backing a Basic

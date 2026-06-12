@@ -582,21 +582,6 @@ public class SecretServiceImpl implements SecretService, AttributeResourceServic
         return secretDetailDto;
     }
 
-    @Override
-    public Map<UUID, String> getLatestFingerprintsByUuid(List<UUID> secretUuids) {
-        if (secretUuids == null || secretUuids.isEmpty()) {
-            return Map.of();
-        }
-        Map<UUID, String> result = new HashMap<>();
-        for (Secret secret : secretRepository.findByUuidIn(secretUuids)) {
-            SecretVersion latest = secret.getLatestVersion();
-            if (latest != null && latest.getFingerprint() != null) {
-                result.put(secret.getUuid(), latest.getFingerprint());
-            }
-        }
-        return result;
-    }
-
     private Secret getSecretEntity(UUID uuid) throws NotFoundException {
         Secret secret = secretRepository.findWithAssociationsByUuid(uuid)
                 .orElseThrow(() -> new NotFoundException(Secret.class, uuid));
@@ -609,6 +594,21 @@ public class SecretServiceImpl implements SecretService, AttributeResourceServic
     public List<SecretVersionDto> getSecretVersions(UUID uuid) throws NotFoundException {
         Secret secret = getSecretEntity(uuid);
         return secret.getVersions().stream().map(SecretVersion::mapToDto).toList();
+    }
+
+    @Override
+    public Map<UUID, String> getLatestFingerprintsByUuid(List<UUID> secretUuids) {
+        if (secretUuids == null || secretUuids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> result = new HashMap<>();
+        for (Secret secret : secretRepository.findWithLatestVersionByUuidIn(secretUuids)) {
+            SecretVersion latest = secret.getLatestVersion();
+            if (latest != null && latest.getFingerprint() != null) {
+                result.put(secret.getUuid(), latest.getFingerprint());
+            }
+        }
+        return result;
     }
 
     @Override

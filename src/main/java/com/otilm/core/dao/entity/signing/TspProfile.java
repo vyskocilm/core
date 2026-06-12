@@ -40,7 +40,7 @@ public class TspProfile extends UniquelyIdentifiedAndAudited implements Securabl
     @Column(name = "enabled", nullable = false)
     private boolean enabled = false;
 
-    @Column(name = "allowed_authentication_methods")
+    @Column(name = "allowed_authentication_methods", nullable = false)
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.ARRAY)
     private List<TspAuthenticationMethod> allowedAuthenticationMethods = new ArrayList<>();

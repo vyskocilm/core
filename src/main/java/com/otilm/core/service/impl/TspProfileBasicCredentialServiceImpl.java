@@ -2,6 +2,7 @@ package com.otilm.core.service.impl;
 
 import com.otilm.api.exception.AlreadyExistException;
 import com.otilm.api.exception.AttributeException;
+import com.otilm.api.exception.ConnectorCommunicationException;
 import com.otilm.api.exception.ConnectorException;
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.exception.ValidationException;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service(Resource.Codes.TSP_PROFILE_BASIC_CREDENTIAL)
@@ -75,7 +77,7 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     @Override
     @ExternalAuthorization(resource = Resource.TSP_PROFILE_BASIC_CREDENTIAL, action = ResourceAction.CREATE, parentResource = Resource.TSP_PROFILE, parentAction = ResourceAction.DETAIL)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public TspBasicCredentialDto create(SecuredParentUUID tspProfileUuid, TspBasicCredentialRequestDto request) throws NotFoundException {
+    public TspBasicCredentialDto create(SecuredParentUUID tspProfileUuid, TspBasicCredentialRequestDto request) throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException {
         TspProfile profile = getTspProfile(tspProfileUuid);
         if (profile.getVaultProfileUuid() == null) {
             throw new ValidationException("A vault profile is required on the TSP profile before adding Basic credentials.");
@@ -95,11 +97,11 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
             row = credentialWriter.insert(row);
         } catch (DataIntegrityViolationException e) {
             deleteVaultSecretQuietly(secretUuid);
-            throw new ValidationException("A Basic credential with username '" + request.getUsername() + "' already exists on this profile.");
+            throw new AlreadyExistException("A Basic credential with username '" + request.getUsername() + "' already exists on this profile.");
         } catch (RuntimeException e) {
             deleteVaultSecretQuietly(secretUuid);
             log.warn("Failed to persist Basic credential for TSP Profile {}", profile.getUuid(), e);
-            throw new ValidationException("Failed to persist Basic credential.");
+            throw e;
         }
         evictModelCache(profile.getName());
         return TspProfileBasicCredentialMapper.mapToDto(row, resolveUserName(row.getMappedUserUuid()));
@@ -108,11 +110,16 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     @Override
     @ExternalAuthorization(resource = Resource.TSP_PROFILE_BASIC_CREDENTIAL, action = ResourceAction.UPDATE, parentResource = Resource.TSP_PROFILE, parentAction = ResourceAction.DETAIL)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public TspBasicCredentialDto update(SecuredParentUUID tspProfileUuid, SecuredUUID uuid, TspBasicCredentialRequestDto request) throws NotFoundException {
+    public TspBasicCredentialDto update(SecuredParentUUID tspProfileUuid, SecuredUUID uuid, TspBasicCredentialRequestDto request) throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException {
         TspProfile profile = getTspProfile(tspProfileUuid);
         TspProfileBasicCredential credential = getCredentialScoped(tspProfileUuid, uuid);
+        ensureUsernameAvailable(profile.getUuid(), request.getUsername(), credential.getUuid());
         validateMappedUser(request.getMappedUserUuid());
 
+        // Vault rotation can run only when a new password is supplied.
+        // On a username-only change the secret's stored username is left stale - it is informational only;
+        // verification reads the username from the credential row, never from the secret content.
+        // A later password rotation heals it, since rotation writes the current username too.
         boolean rotate = request.getPassword() != null && !request.getPassword().isBlank();
         if (rotate) {
             rotateVaultSecret(credential.getSecretUuid(), request.getUsername(), request.getPassword());
@@ -122,7 +129,7 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
         try {
             credential = credentialWriter.update(credential);
         } catch (DataIntegrityViolationException e) {
-            throw new ValidationException("A Basic credential with username '" + request.getUsername() + "' already exists on this profile.");
+            throw new AlreadyExistException("A Basic credential with username '" + request.getUsername() + "' already exists on this profile.");
         }
 
         if (rotate) {
@@ -137,7 +144,7 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     @Override
     @ExternalAuthorization(resource = Resource.TSP_PROFILE_BASIC_CREDENTIAL, action = ResourceAction.DELETE, parentResource = Resource.TSP_PROFILE, parentAction = ResourceAction.DETAIL)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void delete(SecuredParentUUID tspProfileUuid, SecuredUUID uuid) throws NotFoundException {
+    public void delete(SecuredParentUUID tspProfileUuid, SecuredUUID uuid) throws AttributeException, ConnectorCommunicationException, NotFoundException {
         TspProfile profile = getTspProfile(tspProfileUuid);
         TspProfileBasicCredential credential = getCredentialScoped(tspProfileUuid, uuid);
         UUID secretUuid = credential.getSecretUuid();
@@ -153,7 +160,12 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     public void deleteSecretsForProfile(UUID tspProfileUuid) {
         for (TspProfileBasicCredential credential : credentialRepository.findByTspProfileUuid(tspProfileUuid)) {
             UUID secretUuid = credential.getSecretUuid();
-            deleteVaultSecret(secretUuid);
+            try {
+                deleteVaultSecret(secretUuid);
+            } catch (AttributeException | ConnectorCommunicationException e) {
+                log.warn("Could not delete vault secret {} during TSP profile {} teardown; manual reconciliation may be needed.",
+                        secretUuid, tspProfileUuid, e);
+            }
             credentialVerificationCache.evictBySecretUuid(secretUuid);
         }
     }
@@ -181,7 +193,18 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
         return row;
     }
 
-    private UUID createVaultSecret(TspProfile profile, String username, String password) {
+    /**
+     * Rejects a username already taken by a different credential on the same profile, BEFORE any vault rotation runs.
+     */
+    private void ensureUsernameAvailable(UUID tspProfileUuid, String username, UUID excludeCredentialUuid) throws AlreadyExistException {
+        Optional<TspProfileBasicCredential> existing = credentialRepository.findByTspProfileUuidAndUsername(tspProfileUuid, username);
+        if (existing.isPresent() && !existing.get().getUuid().equals(excludeCredentialUuid)) {
+            throw new AlreadyExistException("A Basic credential with username '" + username + "' already exists on this profile.");
+        }
+    }
+
+    private UUID createVaultSecret(TspProfile profile, String username, String password)
+            throws AlreadyExistException, AttributeException, ConnectorCommunicationException, NotFoundException {
         VaultProfile vaultProfile = resolveVaultProfile(profile.getVaultProfileUuid());
         UUID vaultInstanceUuid = vaultProfile.getVaultInstanceUuid();
         SecretRequestDto secretRequest = new SecretRequestDto();
@@ -191,32 +214,35 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
             SecretDetailDto created = secretService.createSecret(secretRequest,
                     SecuredParentUUID.fromUUID(vaultProfile.getUuid()), SecuredUUID.fromUUID(vaultInstanceUuid));
             return UUID.fromString(created.getUuid());
-        } catch (AlreadyExistException | AttributeException | ConnectorException | NotFoundException e) {
-            log.warn("Failed to create Basic credential secret for TSP Profile {}", profile.getUuid(), e);
-            throw new ValidationException("Failed to create Basic credential secret.");
+        } catch (ConnectorException e) {
+            throw vaultUnavailable("create", profile.getUuid().toString(), e);
         }
     }
 
-    private void rotateVaultSecret(UUID secretUuid, String username, String password) {
+    private void rotateVaultSecret(UUID secretUuid, String username, String password)
+            throws AttributeException, ConnectorCommunicationException, NotFoundException {
         SecretUpdateRequestDto updateRequest = new SecretUpdateRequestDto();
         updateRequest.setSecret(new BasicAuthSecretContent(username, password));
         try {
             secretService.updateSecret(secretUuid, updateRequest);
-        } catch (AttributeException | ConnectorException | NotFoundException e) {
-            log.warn("Failed to rotate Basic credential secret {}", secretUuid, e);
-            throw new ValidationException("Failed to rotate Basic credential secret.");
+        } catch (ConnectorException e) {
+            throw vaultUnavailable("rotate", secretUuid.toString(), e);
         }
     }
 
-    private void deleteVaultSecret(UUID secretUuid) {
+    private void deleteVaultSecret(UUID secretUuid) throws AttributeException, ConnectorCommunicationException {
         try {
             secretService.deleteSecret(secretUuid, true);
         } catch (NotFoundException e) {
             log.info("Basic credential secret {} already absent in vault; treating delete as idempotent.", secretUuid);
-        } catch (AttributeException | ConnectorException e) {
-            log.warn("Failed to delete Basic credential secret {}", secretUuid, e);
-            throw new ValidationException("Failed to delete Basic credential secret.");
+        } catch (ConnectorException e) {
+            throw vaultUnavailable("delete", secretUuid.toString(), e);
         }
+    }
+
+    private ConnectorCommunicationException vaultUnavailable(String operation, String reference, ConnectorException cause) {
+        log.warn("Vault connector unavailable while trying to {} Basic credential secret (ref={})", operation, reference, cause);
+        return new ConnectorCommunicationException("The vault connector is currently unavailable.", null);
     }
 
     private void deleteVaultSecretQuietly(UUID secretUuid) {
