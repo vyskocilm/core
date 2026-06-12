@@ -1,6 +1,5 @@
 package com.otilm.core.service.cmp.message.handler;
 
-import com.otilm.api.interfaces.core.cmp.error.CmpProcessingException;
 import com.otilm.api.model.client.connector.v2.ConnectorVersion;
 import com.otilm.api.model.common.enums.cryptography.KeyAlgorithm;
 import com.otilm.api.model.common.enums.cryptography.KeyType;
