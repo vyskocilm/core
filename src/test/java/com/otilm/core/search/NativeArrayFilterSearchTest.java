@@ -1,6 +1,5 @@
 package com.otilm.core.search;
 
-import com.otilm.api.model.client.certificate.SearchFilterRequestDto;
 import com.otilm.api.model.client.certificate.SearchRequestDto;
 import com.otilm.api.model.client.connector.v2.ConnectorInterface;
 import com.otilm.api.model.client.connector.v2.ConnectorVersion;
@@ -12,7 +11,6 @@ import com.otilm.api.model.core.connector.v2.ConnectorDto;
 import com.otilm.api.model.core.oid.CustomOidEntryListResponseDto;
 import com.otilm.api.model.core.oid.OidCategory;
 import com.otilm.api.model.core.search.FilterConditionOperator;
-import com.otilm.api.model.core.search.FilterFieldSource;
 import com.otilm.core.dao.entity.Connector;
 import com.otilm.core.dao.entity.ConnectorInterfaceEntity;
 import com.otilm.core.dao.entity.oid.RdnAttributeTypeCustomOidEntry;

@@ -1,7 +1,6 @@
 package com.otilm.core.service;
 
 import com.otilm.api.model.client.signing.profile.SigningProfileRequestDto;
-import com.otilm.api.model.client.signing.profile.record.SigningRecordPersistenceMode;
 import com.otilm.api.model.client.signing.profile.record.SigningRecordPolicyRequestDto;
 import com.otilm.api.model.client.connector.v2.ConnectorVersion;
 import com.otilm.api.model.client.signing.profile.scheme.DelegatedSigningRequestDto;

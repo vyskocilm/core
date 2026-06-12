@@ -13,7 +13,6 @@ import com.otilm.core.dao.entity.FunctionGroup;
 import com.otilm.core.dao.repository.*;
 import com.otilm.core.service.handler.ConnectorAdapter;
 import com.otilm.core.service.handler.ConnectorV1Adapter;
-import com.otilm.core.service.v2.ConnectorService;
 import com.otilm.core.service.v2.impl.ConnectorServiceImpl;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

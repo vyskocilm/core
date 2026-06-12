@@ -18,7 +18,6 @@ import com.otilm.core.dao.entity.AuditLog;
 import com.otilm.core.dao.repository.AuditLogRepository;
 import com.otilm.core.logging.LoggingHelper;
 import com.otilm.core.messaging.jms.listeners.AuditLogsListener;
-import com.otilm.core.messaging.jms.producers.AuditLogsProducer;
 import com.otilm.core.messaging.model.AuditLogMessage;
 import com.otilm.core.service.SettingService;
 import com.otilm.core.util.BaseSpringBootTest;

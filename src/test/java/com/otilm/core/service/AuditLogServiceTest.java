@@ -20,7 +20,6 @@ import com.otilm.core.dao.entity.AuditLog;
 import com.otilm.core.dao.repository.AuditLogRepository;
 import com.otilm.core.enums.FilterField;
 import com.otilm.core.messaging.jms.listeners.AuditLogsListener;
-import com.otilm.core.messaging.jms.producers.AuditLogsProducer;
 import com.otilm.core.messaging.model.AuditLogMessage;
 import com.otilm.core.model.auth.Resource;
 import com.otilm.core.util.BaseSpringBootTest;
