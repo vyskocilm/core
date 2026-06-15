@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.Objects;
@@ -29,9 +32,10 @@ import java.util.UUID;
  * password-keyed entries for a rotated or deleted secret in one call.</p>
  */
 @Component
-class CredentialVerificationCacheImpl implements CredentialVerificationCache {
+class PepperedCredentialVerificationCache implements CredentialVerificationCache {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final CacheManager cacheManager;
     private final SecretRefIndex secretRefIndex;
@@ -40,7 +44,7 @@ class CredentialVerificationCacheImpl implements CredentialVerificationCache {
     private byte[] pepper;
 
     @Autowired
-    CredentialVerificationCacheImpl(CacheManager cacheManager, SecretRefIndex secretRefIndex) {
+    PepperedCredentialVerificationCache(CacheManager cacheManager, SecretRefIndex secretRefIndex) {
         this.cacheManager = cacheManager;
         this.secretRefIndex = secretRefIndex;
     }
@@ -51,7 +55,7 @@ class CredentialVerificationCacheImpl implements CredentialVerificationCache {
                 cacheManager.getCache(CacheConfig.CREDENTIAL_VERIFICATION_CACHE),
                 "CREDENTIAL_VERIFICATION_CACHE must be registered in CacheConfig");
         byte[] randomPepper = new byte[32];
-        new SecureRandom().nextBytes(randomPepper);
+        SECURE_RANDOM.nextBytes(randomPepper);
         this.pepper = randomPepper;
     }
 
@@ -74,27 +78,31 @@ class CredentialVerificationCacheImpl implements CredentialVerificationCache {
 
     @Override
     public void evictBySecretUuid(UUID secretUuid) {
+        Objects.requireNonNull(secretUuid, "secretUuid must not be null");
+        // Known, accepted trade-off (same as TokenJtiIndex): a putSuccess that interleaves between removeSecret and the
+        // evict loop can leave a fresh positive entry that this call misses. The window is tiny and the entry is bounded
+        // by the cache TTL.
         Set<String> hmacKeys = secretRefIndex.removeSecret(secretUuid);
         if (hmacKeys == null) return;
         hmacKeys.forEach(cache::evict);
     }
-    // Known, accepted trade-off (same as TokenJtiIndex): a putSuccess that interleaves between removeSecret and the evict loop
-    // can leave a fresh positive entry that this call misses.
-    // The window is tiny and the entry is bounded by the cache TTL.
 
     /**
      * Derives a deterministic, non-reversible cache key for the given (secretUuid, password) pair.
      * Uses HMAC-SHA-256 with the per-process pepper so the raw password is never stored.
      */
     private String hmac(UUID secretUuid, String password) {
+        Objects.requireNonNull(secretUuid, "secretUuid must not be null");
+        Objects.requireNonNull(password, "password must not be null");
+
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             mac.init(new SecretKeySpec(pepper, HMAC_ALGORITHM));
-            mac.update(secretUuid.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            mac.update(secretUuid.toString().getBytes(StandardCharsets.UTF_8));
             mac.update((byte) ':');
-            mac.update(password.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            mac.update(password.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(mac.doFinal());
-        } catch (Exception e) {
+        } catch (InvalidKeyException | NoSuchAlgorithmException  e) {
             throw new IllegalStateException("HMAC-SHA-256 unavailable", e);
         }
     }

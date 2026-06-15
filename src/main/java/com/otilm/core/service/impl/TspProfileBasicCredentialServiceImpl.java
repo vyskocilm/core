@@ -28,9 +28,9 @@ import com.otilm.core.security.authz.ExternalAuthorization;
 import com.otilm.core.security.authz.SecuredParentUUID;
 import com.otilm.core.security.authz.SecuredUUID;
 import com.otilm.core.service.TspProfileBasicCredentialService;
-import com.otilm.core.service.SecretService;
+import com.otilm.core.service.SecretExternalService;
 import com.otilm.core.service.UserManagementService;
-import com.otilm.core.service.VaultProfileService;
+import com.otilm.core.service.VaultProfileInternalService;
 import com.otilm.core.service.writer.signing.TspProfileBasicCredentialWriter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,8 +51,8 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     private TspProfileRepository tspProfileRepository;
     private TspProfileBasicCredentialRepository credentialRepository;
     private TspProfileBasicCredentialWriter credentialWriter;
-    private VaultProfileService vaultProfileService;
-    private SecretService secretService;
+    private VaultProfileInternalService vaultProfileService;
+    private SecretExternalService secretService;
     private UserManagementService userManagementService;
     private CredentialVerificationCache credentialVerificationCache;
     private CacheEvictor cacheEvictor;
@@ -124,6 +125,7 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
         if (rotate) {
             rotateVaultSecret(credential.getSecretUuid(), request.getUsername(), request.getPassword());
         }
+        boolean mappedUserChanged = !Objects.equals(credential.getMappedUserUuid(), request.getMappedUserUuid());
         credential.setUsername(request.getUsername());
         credential.setMappedUserUuid(request.getMappedUserUuid());
         try {
@@ -132,9 +134,7 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
             throw new AlreadyExistException("A Basic credential with username '" + request.getUsername() + "' already exists on this profile.");
         }
 
-        if (rotate) {
-            // Evict the cached successful verifications for this secret immediately, so the old password can no longer
-            // authenticate from the cache once it has been rotated.
+        if (rotate || mappedUserChanged) {
             credentialVerificationCache.evictBySecretUuid(credential.getSecretUuid());
         }
         evictModelCache(profile.getName());
@@ -173,10 +173,9 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     @Override
     @Transactional(readOnly = true)
     public void evictCachesForSecret(UUID secretUuid) {
-        credentialRepository.findBySecretUuid(secretUuid).ifPresent(credential -> {
-            evictModelCache(credential.getTspProfile().getName());
-            credentialVerificationCache.evictBySecretUuid(secretUuid);
-        });
+        credentialRepository.findBySecretUuid(secretUuid)
+                .ifPresent(credential -> evictModelCache(credential.getTspProfile().getName()));
+        credentialVerificationCache.evictBySecretUuid(secretUuid);
     }
 
     private TspProfile getTspProfile(SecuredParentUUID tspProfileUuid) throws NotFoundException {
@@ -304,12 +303,12 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
     }
 
     @Autowired
-    public void setVaultProfileService(VaultProfileService vaultProfileService) {
+    public void setVaultProfileService(VaultProfileInternalService vaultProfileService) {
         this.vaultProfileService = vaultProfileService;
     }
 
     @Autowired
-    public void setSecretService(SecretService secretService) {
+    public void setSecretService(SecretExternalService secretService) {
         this.secretService = secretService;
     }
 

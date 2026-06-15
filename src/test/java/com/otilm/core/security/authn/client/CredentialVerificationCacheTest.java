@@ -1,8 +1,12 @@
 package com.otilm.core.security.authn.client;
 
+import com.otilm.core.config.cache.CacheConfig;
 import com.otilm.core.util.BaseSpringBootTest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -14,31 +18,72 @@ class CredentialVerificationCacheTest extends BaseSpringBootTest {
     @Autowired
     private CredentialVerificationCache cache;
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    @Autowired
+    private SecretRefIndex secretRefIndex;
+
+    @BeforeEach
+    void resetCacheState() {
+        Cache verificationCache = cacheManager.getCache(CacheConfig.CREDENTIAL_VERIFICATION_CACHE);
+        if (verificationCache != null) {
+            verificationCache.clear();
+        }
+        secretRefIndex.clear();
+    }
+
     @Test
     void returnsMappedUserOnHit_andEvictionBySecretClearsIt() {
         // given
-        UUID secret = UUID.randomUUID();
-        UUID mappedUser = UUID.randomUUID();
-        assertThat(cache.getMappedUser(secret, "pw")).isEmpty();
+        var secret = UUID.randomUUID();
+        var mappedUser = UUID.randomUUID();
+        var password = "pw";
+        assertThat(cache.getMappedUser(secret, password)).isEmpty();
 
         // when
-        cache.putSuccess(secret, "pw", mappedUser);
+        cache.putSuccess(secret, password, mappedUser);
 
         // then
-        assertThat(cache.getMappedUser(secret, "pw")).isEqualTo(Optional.of(mappedUser));
+        assertThat(cache.getMappedUser(secret, password)).isEqualTo(Optional.of(mappedUser));
 
         // when — the secret is evicted
         cache.evictBySecretUuid(secret);
 
         // then
-        assertThat(cache.getMappedUser(secret, "pw")).isEmpty();
+        assertThat(cache.getMappedUser(secret, password)).isEmpty();
     }
 
     @Test
-    void returnsEmpty_whenPasswordWrong() {
+    void evictBySecretUuidClearsEveryPasswordKeyedEntryForThatSecret() {
+        // given — two distinct passwords for one secret, both registered under the same secretUuid in the secondary index.
+        var secret = UUID.randomUUID();
+        var otherSecret = UUID.randomUUID();
+        var userA = UUID.randomUUID();
+        var userB = UUID.randomUUID();
+        var userC = UUID.randomUUID();
+        cache.putSuccess(secret, "pw1", userA);
+        cache.putSuccess(secret, "pw2", userB);
+        cache.putSuccess(otherSecret, "pw3", userC);
+        assertThat(cache.getMappedUser(secret, "pw1")).isEqualTo(Optional.of(userA));
+        assertThat(cache.getMappedUser(secret, "pw2")).isEqualTo(Optional.of(userB));
+
+        // when — a single eviction by secret
+        cache.evictBySecretUuid(secret);
+
+        // then — every password-keyed entry for that secret is gone in one call
+        assertThat(cache.getMappedUser(secret, "pw1")).isEmpty();
+        assertThat(cache.getMappedUser(secret, "pw2")).isEmpty();
+        // and an unrelated secret is untouched
+        assertThat(cache.getMappedUser(otherSecret, "pw3")).isEqualTo(Optional.of(userC));
+    }
+
+    @Test
+    void returnsEmpty_whenDifferentPassword() {
         // given
-        UUID secret = UUID.randomUUID();
-        cache.putSuccess(secret, "right", UUID.randomUUID());
+        var secret = UUID.randomUUID();
+        var correctPassword = "right";
+        cache.putSuccess(secret, correctPassword, UUID.randomUUID());
 
         // when / then
         assertThat(cache.getMappedUser(secret, "wrong")).isEmpty();

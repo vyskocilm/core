@@ -9,6 +9,13 @@ import java.util.UUID;
  * <p>Only successful authentication verifications are stored; callers must never invoke {@link #putSuccess}
  * on a failed authentication. The cache key is an HMAC-SHA-256 over {@code secretUuid + ":" + password}
  * using a per-process pepper (never persisted), so raw passwords are never stored or reconstructable from cache state.</p>
+ *
+ * <p><b>Staleness contract.</b> Method {@link #getMappedUser} does <b>not</b> re-check per-request liveness of the
+ * mapped user. Eviction is tied to credential lifecycle only: password rotation, mapped-user reassignment,
+ * credential deletion, and secret-content updates (see {@link #evictBySecretUuid}). Account-level changes that do
+ * not touch the credential — notably a mapped user being <b>disabled or deprovisioned</b> — are NOT evicted.
+ * This is a deliberately accepted, TTL-bounded trade-off: user-disable is rare and a per-request liveness check on the
+ * signing hot-path is not affordable.</p>
  */
 public interface CredentialVerificationCache {
 
@@ -29,7 +36,8 @@ public interface CredentialVerificationCache {
 
     /**
      * Evict all cache entries associated with the given secret UUID.
-     * Called on secret rotation or deletion so stale positive hits are cleared immediately.
+     * Called whenever the verified mapping could change: password rotation, mapped-user reassignment,
+     * credential deletion, and secret-content updates — so stale positive hits are cleared immediately.
      */
     void evictBySecretUuid(UUID secretUuid);
 }

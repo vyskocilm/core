@@ -25,9 +25,7 @@ public interface TspProfileBasicCredentialService {
     void delete(SecuredParentUUID tspProfileUuid, SecuredUUID uuid) throws AttributeException, ConnectorCommunicationException, NotFoundException;
 
     /**
-     * Evict the TSP profile model cache and credential-verification cache for the secret backing a Basic
-     * credential, after that secret's content was rotated. No-op if the secret does not back a TSP Basic
-     * credential. Invoked by the secret-content-updated event adapter, not by the HTTP API.
+     * Evicts the TSP profile model cache and credential-verification cache.
      */
     void evictCachesForSecret(UUID secretUuid);
 
