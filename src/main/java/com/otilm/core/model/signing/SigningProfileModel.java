@@ -25,12 +25,13 @@ import java.util.UUID;
  * @param version           Current version number.
  * @param enabled           Whether the profile is currently enabled.
  * @param enabledProtocols  Protocols enabled on this profile (e.g. TSP).
+ * @param tspProfileUuid    UUID of the TSP Profile this signing profile is linked to (TSP activation),
+ *                          or {@code null} if TSP is not activated. The indirect (Signing Profile)
+ *                          timestamping route asserts this matches the authenticating TSP Profile,
+ *                          so the cached model carries the stable link.
  * @param workflow          Workflow-type-specific configuration.
  * @param signingScheme     Signing scheme configuration.
  * @param recordPolicy      Signing record policy (what is captured, retention, persistence mode).
- * @param tspProfileUuid    UUID of the TSP Profile this Signing Profile is linked to, or {@code null} if
- *                          unlinked. The indirect (Signing Profile) timestamping route asserts this matches
- *                          the authenticating TSP Profile, so the cached model carries the stable link.
  * @param <W>               Concrete {@link SigningWorkflow} subtype.
  * @param <SM>              Concrete {@link SigningSchemeModel} subtype.
  */
@@ -42,8 +43,8 @@ public record SigningProfileModel<W extends SigningWorkflow, SM extends SigningS
         int version,
         boolean enabled,
         List<SigningProtocol> enabledProtocols,
+        UUID tspProfileUuid,
         W workflow,
         SM signingScheme,
-        SigningRecordPolicyModel recordPolicy,
-        UUID tspProfileUuid
+        SigningRecordPolicyModel recordPolicy
 ) {}

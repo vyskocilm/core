@@ -4,6 +4,8 @@ import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.interfaces.core.tsp.error.TspException;
 import com.otilm.api.interfaces.core.tsp.error.TspFailureInfo;
 import com.otilm.api.model.core.auth.Resource;
+import com.otilm.api.model.core.signing.SigningProtocol;
+import com.otilm.core.logging.LoggingHelper;
 import com.otilm.core.model.auth.ResourceAction;
 import com.otilm.core.model.signing.SigningProfileModel;
 import com.otilm.core.model.signing.TspProfileModel;
@@ -51,71 +53,65 @@ public class TsaServiceImpl implements TsaService {
 
     @Override
     public TspResponse processTspRequestForTspProfile(String tspProfileName, TspRequest request) throws NotFoundException, TspException {
-        TspProfileModel tspProfile = tspProfileService.resolveTspProfileForAuthentication(tspProfileName);
+        TspProfileModel tspProfile = tspProfileService.getTspProfile(tspProfileName);
         return self.authorizeAndProcessForTspProfile(SecuredUUID.fromUUID(tspProfile.uuid()), tspProfile, request);
     }
 
     @ExternalAuthorization(resource = Resource.TSP_PROFILE, action = ResourceAction.TSP_SIGN)
     public TspResponse authorizeAndProcessForTspProfile(SecuredUUID tspProfileUuid, TspProfileModel tspProfile, TspRequest request)
             throws NotFoundException, TspException {
-        if (!tspProfile.enabled()) {
-            throw new TspException(TspFailureInfo.BAD_REQUEST, "TSP Profile is not enabled", "TSP Profile is not enabled");
+        LoggingHelper.putLogResourceInfo(Resource.TSP_PROFILE, true, tspProfile.uuid().toString(), tspProfile.name());
+
+        if (tspProfile.defaultSigningProfileName() == null) {
+            var message = "TSP profile '%s' does not have a default signing profile".formatted(tspProfile.name());
+            throw new TspException(TspFailureInfo.BAD_REQUEST, message, message);
         }
-        return processSigningProfileInternal(tspProfile.defaultSigningProfileName(), tspProfile, false, request);
+        SigningProfileModel<?, ?> signingProfile = signingProfileService.getSigningProfileModel(tspProfile.defaultSigningProfileName());
+
+        return processTspRequest(signingProfile, tspProfile, request);
     }
 
     @Override
     public TspResponse processTspRequestForSigningProfile(String signingProfileName, TspRequest request) throws NotFoundException, TspException {
-        TspProfileModel tspProfile = signingProfileService.resolveTspProfileForSigningProfileAuthentication(signingProfileName)
-                .orElseThrow(() -> new TspException(TspFailureInfo.BAD_REQUEST,
-                        "Signing Profile '%s' has no linked TSP Profile".formatted(signingProfileName),
-                        "Signing Profile is not available for timestamping"));
-        return self.authorizeAndProcessForSigningProfile(SecuredUUID.fromUUID(tspProfile.uuid()), tspProfile, signingProfileName, request);
+        SigningProfileModel<?, ?> signingProfile = signingProfileService.getSigningProfileModel(signingProfileName);
+        LoggingHelper.putLogResourceInfo(Resource.SIGNING_PROFILE, true, signingProfile.uuid().toString(), signingProfile.name());
+
+        if (!signingProfile.enabledProtocols().contains(SigningProtocol.TSP) || signingProfile.tspProfileUuid() == null) {
+            var message = "Signing profile '%s' does not have a TSP profile associated.".formatted(signingProfile.name());
+            throw new TspException(TspFailureInfo.BAD_REQUEST, message, message);
+        }
+
+        return self.authorizeAndProcessForSigningProfile(SecuredUUID.fromUUID(signingProfile.tspProfileUuid()), signingProfile, request);
     }
 
     @ExternalAuthorization(resource = Resource.TSP_PROFILE, action = ResourceAction.TSP_SIGN)
-    public TspResponse authorizeAndProcessForSigningProfile(SecuredUUID tspProfileUuid, TspProfileModel tspProfile, String signingProfileName, TspRequest request)
+    public TspResponse authorizeAndProcessForSigningProfile(SecuredUUID tspProfileUuid, SigningProfileModel<?, ?> signingProfile, TspRequest request)
             throws NotFoundException, TspException {
-        if (!tspProfile.enabled()) {
-            throw new TspException(TspFailureInfo.BAD_REQUEST, "TSP Profile is not enabled", "TSP Profile is not enabled");
-        }
-        return processSigningProfileInternal(signingProfileName, tspProfile, true, request);
+        TspProfileModel tspProfile = tspProfileService.getTspProfile(signingProfile.tspProfileUuid());
+        return processTspRequest(signingProfile, tspProfile, request);
     }
 
-    private TspResponse processSigningProfileInternal(String signingProfileName, TspProfileModel tspProfile, boolean assertLinkage, TspRequest request) throws NotFoundException, TspException {
-        SigningProfileModel<?, ?> signingProfile = signingProfileService.getSigningProfileModel(signingProfileName);
-        if (assertLinkage) {
-            assertLinkedToTspProfile(signingProfile, tspProfile);
+    private TspResponse processTspRequest(SigningProfileModel<?, ?> signingProfile, TspProfileModel tspProfile, TspRequest request) throws TspException {
+        if (!signingProfile.enabled()) {
+            var message = "Signing profile '%s' is disabled".formatted(signingProfile.name());
+            throw new TspException(TspFailureInfo.BAD_REQUEST, message, message);
         }
 
-        if (!signingProfile.enabled()) {
-            throw new TspException(TspFailureInfo.BAD_REQUEST, "Signing Profile is not enabled", "Signing Profile is not enabled");
+        if (!tspProfile.enabled()) {
+            var message = "TSP profile '%s' is disabled".formatted(tspProfile.name());
+            throw new TspException(TspFailureInfo.BAD_REQUEST, message, message);
         }
 
         SigningWorkflow workflow = signingProfile.workflow();
         if (!(workflow instanceof ManagedTimestampingWorkflow timestampingWorkflow)) {
             throw new TspException(TspFailureInfo.SYSTEM_FAILURE,
                     "Signing Profile '%s' is not a managed timestamping profile (workflow: %s)".formatted(
-                            signingProfileName, workflow.getClass().getSimpleName()),
+                            signingProfile.name(), workflow.getClass().getSimpleName()),
                     "The system is misconfigured.");
         }
         tspRequestValidator.validate(timestampingWorkflow, request);
 
         ResolvedManagedTimestampingProfile resolvedProfile = signingProfileResolverFactory.resolve(signingProfile);
         return managedTimestampEngine.process(request, resolvedProfile);
-    }
-
-    /**
-     * Asserts the client-chosen Signing Profile (indirect route) is actually linked to the TSP Profile we authenticated against.
-     * The indirect resolution derives the TSP Profile from the Signing Profile's link, so this guards against the two cache reads
-     * diverging (cache skew).
-     */
-    static void assertLinkedToTspProfile(SigningProfileModel<?, ?> signingProfile, TspProfileModel tspProfile) throws TspException {
-        if (!tspProfile.uuid().equals(signingProfile.tspProfileUuid())) {
-            throw new TspException(TspFailureInfo.BAD_REQUEST,
-                    "Signing Profile '%s' (tspProfileUuid=%s) is not linked to TSP Profile '%s' (uuid=%s)".formatted(
-                            signingProfile.name(), signingProfile.tspProfileUuid(), tspProfile.name(), tspProfile.uuid()),
-                    "Signing Profile is not available for timestamping");
-        }
     }
 }

@@ -523,7 +523,7 @@ public class TspProtocolFlowITest extends BaseSpringBootTest {
         request.setDescription(description);
         request.setDefaultSigningProfileUuid(defaultSigningProfileUuid);
 
-        UUID tspProfileUuid = UUID.fromString(tspProfileService.createTspProfile(request).getUuid());
+        UUID tspProfileUuid = UUID.fromString(tspProfileService.createTspProfile(request, "http://localhost").getUuid());
         tspProfileService.enableTspProfile(SecuredUUID.fromUUID(tspProfileUuid));
     }
 

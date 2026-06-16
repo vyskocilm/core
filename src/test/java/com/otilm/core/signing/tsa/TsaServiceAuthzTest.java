@@ -181,7 +181,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
                     .isInstanceOf(TspException.class)
                     .satisfies(ex -> {
                         assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST);
-                        assertThat(((TspException) ex).getClientMessage()).contains("not enabled");
+                        assertThat(((TspException) ex).getClientMessage()).contains("disabled");
                     });
         }
 
@@ -196,7 +196,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
                     .isInstanceOf(TspException.class)
                     .satisfies(ex -> {
                         assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST);
-                        assertThat(((TspException) ex).getClientMessage()).contains("not enabled");
+                        assertThat(((TspException) ex).getClientMessage()).contains("disabled");
                     });
         }
 
@@ -264,7 +264,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
                     .isInstanceOf(TspException.class)
                     .satisfies(ex -> {
                         assertThat(((TspException) ex).getFailureInfo()).isEqualTo(TspFailureInfo.BAD_REQUEST);
-                        assertThat(((TspException) ex).getClientMessage()).contains("not enabled");
+                        assertThat(((TspException) ex).getClientMessage()).contains("disabled");
                     });
         }
 

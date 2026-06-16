@@ -6,7 +6,7 @@ import com.otilm.api.model.common.AuthenticationServiceExceptionDto;
 import com.otilm.api.model.common.ErrorMessageDto;
 import com.otilm.api.model.core.acme.ProblemDocument;
 import com.otilm.api.model.core.auth.Resource;
-import com.otilm.core.api.tsp.TSPResponseBuilder;
+import com.otilm.core.api.tsp.TspResponseBuilder;
 import com.otilm.core.security.authn.PlatformAuthenticationException;
 import com.otilm.core.security.exception.AuthenticationServiceException;
 import com.otilm.core.util.AuthHelper;
@@ -616,7 +616,7 @@ public class ExceptionHandlingAdvice {
     @ExceptionHandler(TspException.class)
     public ResponseEntity<byte[]> handleTspException(TspException ex) {
         LOG.error("TSP error ({}): {}", ex.getFailureInfo(), ex.getMessage());
-        byte[] body = TSPResponseBuilder.buildRejection(ex.getFailureInfo(), "An unexpected error occurred during timestamping.");
+        byte[] body = TspResponseBuilder.buildRejection(ex.getFailureInfo(), "An unexpected error occurred during timestamping.");
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("application/timestamp-response"))
                 .body(body);

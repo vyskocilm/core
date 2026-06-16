@@ -190,20 +190,21 @@ class TsaServiceImplTest extends BaseSpringBootTest {
         }
 
         @Test
-        void throwsValidationException_whenRequestContainsExtensions() {
-            // given
-            SigningProfile profile = createTimestampingSigningProfile("sp-no-extensions");
+        void passesRequestExtensionsThrough_toEngine() throws Exception {
+            // given — request extensions are no longer rejected; they are forwarded to the timestamping engine
+            SigningProfile profile = createTimestampingSigningProfile("sp-with-extensions");
             Extension dummyExtension = new Extension(
                     new ASN1ObjectIdentifier("1.2.3.4.5"), false, new DEROctetString(new byte[]{1}));
+            Extensions extensions = new Extensions(dummyExtension);
             TspRequest requestWithExtensions = aTspRequest()
-                    .requestExtensions(new Extensions(dummyExtension))
+                    .requestExtensions(extensions)
                     .build();
 
-            // when / then
-            assertThatThrownBy(() -> tsaService.processTspRequestForSigningProfile(profile.getName(), requestWithExtensions))
-                    .isInstanceOf(TspRequestValidationException.class)
-                    .satisfies(ex -> assertThat(((TspRequestValidationException) ex).getFailureInfo())
-                            .isEqualTo(TspFailureInfo.UNACCEPTED_EXTENSION));
+            // when
+            tsaService.processTspRequestForSigningProfile(profile.getName(), requestWithExtensions);
+
+            // then — the request reaches the engine carrying its extensions, rather than being rejected
+            verify(managedTimestampEngine).process(argThat(r -> extensions.equals(r.requestExtensions())), any());
         }
 
         @Test
