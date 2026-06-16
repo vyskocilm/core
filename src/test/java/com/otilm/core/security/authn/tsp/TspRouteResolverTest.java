@@ -57,19 +57,25 @@ class TspRouteResolverTest {
         }
 
         @Test
-        void returnsTrue_whenDirectSignPath() {
+        void returnsTrue_whenDirectPath() {
             // when / then
-            assertThat(resolver.matches("/v1/protocols/tsp/p1/sign")).isTrue();
+            assertThat(resolver.matches("/v1/protocols/tsp/p1")).isTrue();
+        }
+
+        @Test
+        void returnsTrue_whenIndirectSigningProfilePath() {
+            // when / then
+            assertThat(resolver.matches("/v1/protocols/tsp/signingProfiles/sp1")).isTrue();
         }
 
         @Test
         void returnsFalse_whenMultiSegmentPath() {
             // when / then
-            assertThat(resolver.matches("/v1/protocols/tsp/a/b/sign")).isFalse();
+            assertThat(resolver.matches("/v1/protocols/tsp/a/b")).isFalse();
         }
 
         @Test
-        void returnsFalse_whenNonSignPath() {
+        void returnsFalse_whenTrailingExtraSegment() {
             // when / then
             assertThat(resolver.matches("/v1/protocols/tsp/p1/verify")).isFalse();
         }
@@ -87,7 +93,7 @@ class TspRouteResolverTest {
             when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(profile);
 
             // when
-            Optional<TspProfileModel> resolved = resolver.resolve(requestWith("/v1/protocols/tsp/p1/sign"));
+            Optional<TspProfileModel> resolved = resolver.resolve(requestWith("/v1/protocols/tsp/p1"));
 
             // then
             assertThat(resolved.orElseThrow()).isSameAs(profile);
@@ -101,7 +107,7 @@ class TspRouteResolverTest {
             when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1")).thenReturn(Optional.of(profile));
 
             // when
-            Optional<TspProfileModel> resolved = resolver.resolve(requestWith("/v1/protocols/tsp/signingProfiles/sp1/sign"));
+            Optional<TspProfileModel> resolved = resolver.resolve(requestWith("/v1/protocols/tsp/signingProfiles/sp1"));
 
             // then
             assertThat(resolved.orElseThrow()).isSameAs(profile);
@@ -111,7 +117,7 @@ class TspRouteResolverTest {
         @Test
         void returnsEmpty_whenNonMatchingPath_withoutTouchingServices() throws NotFoundException {
             // when
-            Optional<TspProfileModel> resolved = resolver.resolve(requestWith("/v1/protocols/tsp/a/b/sign"));
+            Optional<TspProfileModel> resolved = resolver.resolve(requestWith("/v1/protocols/tsp/a/b"));
 
             // then
             assertThat(resolved).isEmpty();
