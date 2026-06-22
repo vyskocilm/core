@@ -31,6 +31,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.List;
 import java.util.UUID;
 
+import static com.otilm.core.util.builders.TspProfileEntityBuilder.aTspProfile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,8 +57,6 @@ class TspProfileBasicCredentialServiceImplTest extends BaseSpringBootTest {
     @MockitoBean
     private SecretServiceImpl secretService;
     @MockitoBean
-    private CredentialVerificationCache credentialVerificationCache;
-    @MockitoBean
     private UserManagementServiceImpl userManagementService;
     @MockitoBean
     private CredentialVerificationCache credentialVerificationCache;
@@ -78,14 +77,14 @@ class TspProfileBasicCredentialServiceImplTest extends BaseSpringBootTest {
         vaultProfile.setVaultInstanceUuid(vaultInstance.getUuid());
         vaultProfileRepository.save(vaultProfile);
 
-        profileWithVault = new TspProfile();
-        profileWithVault.setName("tsp-with-vault");
-        profileWithVault.setVaultProfileUuid(vaultProfile.getUuid());
-        profileWithVault = tspProfileRepository.save(profileWithVault);
+        profileWithVault = tspProfileRepository.save(aTspProfile()
+                .withName("tsp-with-vault")
+                .withVaultProfileUuid(vaultProfile.getUuid())
+                .build());
 
-        profileNoVault = new TspProfile();
-        profileNoVault.setName("tsp-no-vault");
-        profileNoVault = tspProfileRepository.save(profileNoVault);
+        profileNoVault = tspProfileRepository.save(aTspProfile()
+                .withName("tsp-no-vault")
+                .build());
 
         mappedUserUuid = UUID.randomUUID();
 

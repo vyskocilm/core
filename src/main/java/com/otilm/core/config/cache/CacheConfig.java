@@ -64,17 +64,17 @@ public class CacheConfig {
                 .recordStats()
                 .removalListener(userCertificateIndex)
                 .build());
-        mgr.registerCustomCache(CREDENTIAL_VERIFICATION_CACHE, Caffeine.newBuilder()
-                .expireAfterWrite(authCacheProperties.ttlMinutes(), TimeUnit.MINUTES)
-                .maximumSize(authCacheProperties.maxSize())
-                .recordStats()
-                .removalListener(secretRefIndex)
-                .build());
         mgr.registerCustomCache(TOKEN_AUTH_CACHE, Caffeine.newBuilder()
                 .expireAfterWrite(authCacheProperties.ttlMinutes(), TimeUnit.MINUTES)
                 .maximumSize(authCacheProperties.maxSize())
                 .recordStats()
                 .removalListener(tokenJtiIndex)
+                .build());
+        mgr.registerCustomCache(CREDENTIAL_VERIFICATION_CACHE, Caffeine.newBuilder()
+                .expireAfterWrite(authCacheProperties.ttlMinutes(), TimeUnit.MINUTES)
+                .maximumSize(authCacheProperties.maxSize())
+                .recordStats()
+                .removalListener(secretRefIndex)
                 .build());
 
         mgr.registerCustomCache(CERTIFICATE_CHAIN_CACHE, Caffeine.newBuilder()

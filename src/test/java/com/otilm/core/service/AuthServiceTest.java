@@ -80,7 +80,7 @@ class AuthServiceTest extends BaseSpringBootTest {
 
         UserProfileDetailDto userProfileDto = authService.getAuthProfile();
         List<Resource> allowedListings = userProfileDto.getPermissions().getAllowedListings();
-        // 4 permission-derived listings (CERTIFICATE, CRYPTOGRAPHIC_KEY, SECRET as owner-scoped, SETTINGS by list action) + DASHBOARD and APPROVAL added by default
+        // 4 permission-derived listings + DASHBOARD and APPROVAL added by default
         Assertions.assertEquals(6, allowedListings.size());
         Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
         Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");
@@ -88,7 +88,7 @@ class AuthServiceTest extends BaseSpringBootTest {
         // allow also users through group object member permissions
         injectLocalhostUserProfileChangedToContext();
         allowedListings = authService.getAuthProfile().getPermissions().getAllowedListings();
-        // 6 permission-derived listings (the 4 above + GROUP by its list action + USER via group object member permissions) + DASHBOARD and APPROVAL added by default
+        // 6 permission-derived listings + DASHBOARD and APPROVAL added by default
         Assertions.assertEquals(8, allowedListings.size());
         Assertions.assertTrue(allowedListings.contains(Resource.DASHBOARD), "DASHBOARD must be allowed by default");
         Assertions.assertTrue(allowedListings.contains(Resource.APPROVAL), "APPROVAL must be allowed by default");

@@ -13,7 +13,6 @@ import com.otilm.core.signing.tsa.messages.TspResponse;
 import com.otilm.core.signing.tsa.resolver.SigningProfileResolverFactory;
 import com.otilm.core.signing.tsa.validator.TspRequestValidationException;
 import com.otilm.core.signing.tsa.validator.TspRequestValidator;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,13 +57,6 @@ class TsaServiceImplUnitTest {
     TsaServiceImpl tsaService;
 
     private static final UUID TSP_PROFILE_UUID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
-
-    @BeforeEach
-    void wireSelf() {
-        // Authorization is applied via @ExternalAuthorization on the self-invoked authorizeAndProcess* methods;
-        // outside a Spring proxy the aspect is inert, so point self at the bean to exercise the delegation path.
-        tsaService.setSelf(tsaService);
-    }
 
     // ── helpers ───────────────────────────────────────────────────────────────
 

@@ -607,18 +607,4 @@ public class ExceptionHandlingAdvice {
                 : ex.getMessage();
         return ResponseEntity.status(ex.getProblemDetail().getStatus()).body(new ErrorMessageDto(message));
     }
-
-    /**
-     * Handler for {@link TspException}.
-     *
-     * @return DER-encoded TimeStampResp with rejection status and failure info per RFC 3161.
-     */
-    @ExceptionHandler(TspException.class)
-    public ResponseEntity<byte[]> handleTspException(TspException ex) {
-        LOG.error("TSP error ({}): {}", ex.getFailureInfo(), ex.getMessage());
-        byte[] body = TspResponseBuilder.buildRejection(ex.getFailureInfo(), "An unexpected error occurred during timestamping.");
-        return ResponseEntity.ok()
-                .contentType(MediaType.valueOf("application/timestamp-response"))
-                .body(body);
-    }
 }
