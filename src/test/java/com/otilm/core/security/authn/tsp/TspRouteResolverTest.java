@@ -63,7 +63,7 @@ class TspRouteResolverTest {
         }
 
         @Test
-        void returnsTrue_whenIndirectSigningProfilePath() {
+        void returnsTrue_whenIndirectPath() {
             // when / then
             assertThat(resolver.matches("/v1/protocols/tsp/signingProfiles/sp1")).isTrue();
         }
@@ -75,9 +75,9 @@ class TspRouteResolverTest {
         }
 
         @Test
-        void returnsFalse_whenTrailingExtraSegment() {
+        void returnsFalse_whenNoProfileName() {
             // when / then
-            assertThat(resolver.matches("/v1/protocols/tsp/p1/verify")).isFalse();
+            assertThat(resolver.matches("/v1/protocols/tsp/")).isFalse();
         }
     }
 

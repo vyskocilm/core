@@ -15,8 +15,8 @@ import java.util.UUID;
 
 /**
  * Writes the authenticated identity into the {@link SecurityContext} on behalf of the TSP authenticators.
- * Centralises the two ways a TSP request gains an authenticated principal: directly from connector-resolved
- * {@link AuthenticationInfo} (certificate / bearer token), or by proxying as a mapped user (Basic password).
+ * Centralizes the two ways a TSP request gains an authenticated principal: directly from an authenticated identity
+ * (certificate / bearer token), or by proxying as a pre-configured mapped user (Basic password).
  */
 public class TspSecurityContextWriter {
 
@@ -28,7 +28,10 @@ public class TspSecurityContextWriter {
         this.authHelper = authHelper;
     }
 
-    /** Populates the context from connector-resolved auth info. Returns {@code false} (context untouched) for anonymous/empty info. */
+    /**
+     * Populates the context from auth-service-resolved {@link AuthenticationInfo}.
+     * Returns {@code false} (context untouched) for anonymous/empty info.
+     */
     public boolean setFromAuthInfo(AuthenticationInfo authInfo) {
         if (authInfo == null || authInfo.isAnonymous()) {
             return false;
@@ -41,15 +44,19 @@ public class TspSecurityContextWriter {
         return true;
     }
 
-    /** Authenticates as the mapped user via the user-proxy. Returns {@code false} (and clears the context) if the proxy call fails. */
+    /**
+     * Authenticates as the mapped user via the user-proxy. Returns {@code false} (and clears the context) if the proxy call fails.
+     */
     public boolean authenticateAsUser(UUID mappedUserUuid) {
         try {
             authHelper.authenticateAsUser(mappedUserUuid);
             return true;
         } catch (RuntimeException e) {
             // The credential matched, but the user-proxy authentication call failed (e.g. auth service outage).
-            // Leave the context unauthenticated.
+            // Leave the context unauthenticated and drop the actor attribution that authenticateAsUser set before
+            // the failing proxy call, so the failure is not misattributed to the mapped user.
             SecurityContextHolder.clearContext();
+            LoggingHelper.clearActorInfo();
             log.warn("TSP authentication: user-proxy authentication failed after credential match: {}", e.getMessage());
             return false;
         }

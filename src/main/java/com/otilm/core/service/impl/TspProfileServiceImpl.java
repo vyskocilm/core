@@ -142,12 +142,6 @@ public class TspProfileServiceImpl implements TspProfileService {
         return self.loadTspProfileModel(name);
     }
 
-    // DEFERRED OPTIMIZATION (TSP profile cache, UUID key): this cache is keyed by name only. The indirect
-    // (Signing Profile) authentication path holds a stable tspProfileUuid via the SP->TSP link but can only
-    // address this cache by the mutable name, so it must translate uuid->name through a DB read every request
-    // (see SigningProfileServiceImpl#loadLinkedTspProfileName). Adding a parallel UUID-keyed view here would
-    // let that path resolve the model from the stable uuid with zero DB access and no rename-staleness hazard.
-    // Deferred: it widens the cache-coherence surface (every eviction site must then evict both keys).
     @Cacheable(value = CacheConfig.TSP_PROFILE_CACHE, key = "#name", sync = true)
     @Transactional(readOnly = true)
     public TspProfileModel loadTspProfileModel(String name) throws NotFoundException {

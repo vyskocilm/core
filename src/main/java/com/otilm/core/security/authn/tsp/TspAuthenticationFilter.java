@@ -2,6 +2,7 @@ package com.otilm.core.security.authn.tsp;
 
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.model.core.signing.TspAuthenticationMethod;
+import com.otilm.core.logging.LoggingHelper;
 import com.otilm.core.model.signing.TspProfileModel;
 import com.otilm.core.security.authn.PlatformAuthenticationToken;
 import jakarta.servlet.FilterChain;
@@ -62,13 +63,13 @@ public class TspAuthenticationFilter extends OncePerRequestFilter {
         try {
             Optional<TspProfileModel> resolved = routeResolver.resolve(request);
             if (resolved.isEmpty()) {
-                challengeWriter.send401(response, null);
+                reject(response, null);
                 return;
             }
             profile = resolved.get();
         } catch (NotFoundException e) {
             log.warn("TSP authentication: TSP profile not found for '{}': {}", request.getRequestURI(), e.getMessage());
-            challengeWriter.send401(response, null);
+            reject(response, null);
             return;
         }
 
@@ -79,16 +80,25 @@ public class TspAuthenticationFilter extends OncePerRequestFilter {
         if (authenticator == null || !profile.allowedAuthenticationMethods().contains(authenticator.method())) {
             TspAuthenticationMethod presented = authenticator == null ? null : authenticator.method();
             log.warn("TSP authentication: presented authentication method '{}' not allowed for profile '{}'.", presented, profile.name());
-            challengeWriter.send401(response, profile);
+            reject(response, profile);
             return;
         }
 
         if (!authenticator.authenticate(request, profile)) {
-            SecurityContextHolder.clearContext();
-            challengeWriter.send401(response, profile);
+            reject(response, profile);
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Clears any {@link SecurityContext} and actor MDC attribution an authenticator may have partially populated, so a
+     * rejected request leaks no identity onto the request thread, then writes the 401 challenge.
+     */
+    private void reject(HttpServletResponse response, TspProfileModel profile) {
+        SecurityContextHolder.clearContext();
+        LoggingHelper.clearActorInfo();
+        challengeWriter.send401(response, profile);
     }
 }

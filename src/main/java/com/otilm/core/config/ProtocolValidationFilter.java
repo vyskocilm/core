@@ -59,8 +59,7 @@ public class ProtocolValidationFilter extends OncePerRequestFilter {
             authHelper.authenticateAsSystemUser(AuthHelper.CMP_USERNAME);
             filterChain.doFilter(requestWrapper, responseWrapper);
         } else if (requestUri.matches(prefixRegex + "tsp/.*$")) {
-            // TSP requests are authenticated by the dedicated TSP security chain; pass through without
-            // overwriting the already-resolved principal with a system user.
+            // TSP requests are authenticated by the dedicated TSP security chain.
             filterChain.doFilter(requestWrapper, responseWrapper);
         } else {
             resolver.resolveException(request, response, null, new ValidationException("Invalid protocol request"));

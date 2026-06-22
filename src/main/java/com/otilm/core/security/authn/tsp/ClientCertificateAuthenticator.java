@@ -49,9 +49,7 @@ public class ClientCertificateAuthenticator implements TspAuthenticator {
             String thumbprint = CertificateUtil.getThumbprint(derBytes);
             AuthenticationInfo authInfo = authClient.authenticateByCertificate(rawCertHeader, thumbprint);
             return contextWriter.setFromAuthInfo(authInfo);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
-        } catch (RuntimeException e) {
+        } catch (NoSuchAlgorithmException | RuntimeException e) {
             log.warn("TSP authentication: client-certificate authentication failed: {}", e.getMessage());
             return false;
         }

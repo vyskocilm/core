@@ -3,6 +3,7 @@ package com.otilm.core.security.authn.tsp;
 import com.otilm.api.exception.NotFoundException;
 import com.otilm.api.model.core.logging.enums.ActorType;
 import com.otilm.api.model.core.logging.enums.AuthMethod;
+import com.otilm.api.model.connector.secrets.content.BasicAuthSecretContent;
 import com.otilm.api.model.core.signing.TspAuthenticationMethod;
 import com.otilm.core.auth.oauth2.PlatformJwtDecoder;
 import com.otilm.core.model.signing.TspProfileModel;
@@ -13,6 +14,7 @@ import com.otilm.core.security.authn.client.PlatformAuthenticationClient;
 import com.otilm.core.service.SigningProfileService;
 import com.otilm.core.service.TspProfileService;
 import com.otilm.core.util.AuthHelper;
+import com.otilm.core.util.SecretsUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -119,8 +121,8 @@ class TspAuthenticationFilterTest {
 
     private static String fingerprintOf(String username, String password) {
         try {
-            return com.otilm.core.util.SecretsUtil.calculateSecretContentFingerprint(
-                    new com.otilm.api.model.connector.secrets.content.BasicAuthSecretContent(username, password));
+            return SecretsUtil.calculateSecretContentFingerprint(
+                    new BasicAuthSecretContent(username, password));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -241,9 +243,7 @@ class TspAuthenticationFilterTest {
             // then
             assertThat(response.getStatus()).isEqualTo(401);
             String header = response.getHeader("WWW-Authenticate");
-            assertThat(header).isNotNull();
-            assertThat(header).contains("Bearer");
-            assertThat(header).doesNotContain("Basic");
+            assertThat(header).isNotNull().contains("Bearer").doesNotContain("Basic");
             assertThat(chain.getRequest()).isNull();
         }
     }
@@ -255,7 +255,7 @@ class TspAuthenticationFilterTest {
 
         @Test
         void isNotGated_whenMultiSegmentTspPath() throws Exception {
-            // given — a multi-segment name after the prefix must not be treated as a single profile name,
+            // given — a multi-segment tail under the prefix must not be treated as a single profile name,
             // nor confused with the indirect signingProfiles route.
             setPath("/v1/protocols/tsp/a/b");
 
@@ -285,8 +285,8 @@ class TspAuthenticationFilterTest {
         }
 
         @Test
-        void isNotGated_whenTrailingExtraSegment() throws Exception {
-            // given
+        void isNotGated_whenSubResourceUnderProfile() throws Exception {
+            // given — only the exact single-segment profile path is gated; a deeper sub-resource is not
             setPath("/v1/protocols/tsp/p1/verify");
 
             // when / then
@@ -336,12 +336,13 @@ class TspAuthenticationFilterTest {
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
             request.addHeader("Authorization", "Bearer the.jwt.token");
+            Instant issuedAt = Instant.parse("2026-01-01T00:00:00Z");
             Jwt jwt = Jwt.withTokenValue("the.jwt.token")
                     .header("alg", "none")
                     .claim("sub", "alice")
                     .claim("jti", "jti-1")
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(60))
+                    .issuedAt(issuedAt)
+                    .expiresAt(issuedAt.plusSeconds(60))
                     .build();
             when(jwtDecoder.decode("the.jwt.token")).thenReturn(jwt);
             when(authClient.authenticateByToken(any())).thenReturn(authenticatedInfo());
@@ -477,8 +478,7 @@ class TspAuthenticationFilterTest {
             // then
             assertThat(response.getStatus()).isEqualTo(401);
             String header = response.getHeader("WWW-Authenticate");
-            assertThat(header).isNotNull();
-            assertThat(header).contains("Basic realm=\"p1\"");
+            assertThat(header).isNotNull().contains("Basic realm=\"p1\"");
         }
     }
 

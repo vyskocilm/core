@@ -31,7 +31,7 @@ public class TspRouteResolver {
         this.signingProfileService = signingProfileService;
     }
 
-    /** Whether the given servlet path is a TSP sign endpoint this filter must gate. */
+    /** Whether the given servlet path is a TSP timestamping endpoint this filter must gate. */
     public boolean matches(String servletPath) {
         return extractPathName(servletPath) != null;
     }
@@ -55,7 +55,7 @@ public class TspRouteResolver {
      *   <li>the TSP Profile name for the direct route {@code /v1/protocols/tsp/{name}}, or</li>
      *   <li>{@code signingProfiles/<signingProfileName>} for the indirect route
      *       {@code /v1/protocols/tsp/signingProfiles/{name}}, or</li>
-     *   <li>{@code null} when the path is not a single-segment TSP endpoint.</li>
+     *   <li>{@code null} when the path is not a single-segment TSP timestamping endpoint.</li>
      * </ul>
      */
     private String extractPathName(String servletPath) {

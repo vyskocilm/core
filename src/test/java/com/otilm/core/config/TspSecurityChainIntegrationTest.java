@@ -7,13 +7,15 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+
+import java.util.UUID;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.convert.support.GenericConversionService;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.web.http.SessionRepositoryFilter;
@@ -35,11 +37,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>a TSP request with no credentials is rejected with {@code 401} by the TSP chain;</li>
  *   <li>the {@code /v1/tspProfiles} management API is served by the catch-all {@code @Order(2)} chain and is
  *       unaffected by the TSP chain's {@code 401} backstop;</li>
- *   <li>the JDBC session / cookie filter does not run for a TSP request (no session cookie is set).</li>
+ *   <li>a TSP request establishes no session cookie (the JDBC session filter sets no {@code SESSION} cookie).</li>
  * </ul>
  */
 @AutoConfigureMockMvc
-@SpringBootTest
 class TspSecurityChainIntegrationTest extends BaseSpringBootTestNoAuth {
 
     @Autowired
@@ -84,7 +85,7 @@ class TspSecurityChainIntegrationTest extends BaseSpringBootTestNoAuth {
         mockServer.start();
         WireMock.configureFor("localhost", mockServer.port());
 
-        String certificateUserUuid = java.util.UUID.randomUUID().toString();
+        String certificateUserUuid = UUID.randomUUID().toString();
         addAuthPostStub(CERTIFICATE_HEADER_VALUE, certificateUserUuid, CERTIFICATE_USER_USERNAME);
         addAuthGetSub(certificateUserUuid, CERTIFICATE_USER_USERNAME);
     }
@@ -128,7 +129,7 @@ class TspSecurityChainIntegrationTest extends BaseSpringBootTestNoAuth {
                 .andExpect(status().isUnauthorized())
                 .andReturn();
 
-        // then — the JDBC session / cookie filter must not run for TSP requests: no session cookie is established
+        // then — a TSP request establishes no session cookie
         assertThat(result.getResponse().getCookie(CookieConfig.COOKIE_NAME))
                 .as("TSP chain must not set a session cookie")
                 .isNull();

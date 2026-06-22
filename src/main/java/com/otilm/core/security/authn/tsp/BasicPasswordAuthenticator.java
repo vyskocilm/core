@@ -1,5 +1,6 @@
 package com.otilm.core.security.authn.tsp;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.otilm.api.model.connector.secrets.content.BasicAuthSecretContent;
 import com.otilm.api.model.core.signing.TspAuthenticationMethod;
 import com.otilm.core.model.signing.TspProfileModel;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +51,7 @@ public class BasicPasswordAuthenticator implements TspAuthenticator {
     @Override
     public boolean authenticate(HttpServletRequest request, TspProfileModel profile) {
         String[] credentials = decodeBasicCredentials(request.getHeader(HttpHeaders.AUTHORIZATION));
-        if (credentials == null) {
+        if (credentials.length != 2) {
             return false;
         }
         String username = credentials[0];
@@ -64,6 +66,8 @@ public class BasicPasswordAuthenticator implements TspAuthenticator {
                 .findFirst()
                 .orElse(null);
         if (credential == null) {
+            // Compute and discard a fingerprint to prevent side-channel timing attacks.
+            computeFingerprint(username, password, profile);
             log.warn("TSP authentication: no Basic credential for the presented username on profile '{}'.", profile.name());
             return false;
         }
@@ -75,11 +79,8 @@ public class BasicPasswordAuthenticator implements TspAuthenticator {
             return contextWriter.authenticateAsUser(cached.get());
         }
 
-        String candidate;
-        try {
-            candidate = SecretsUtil.calculateSecretContentFingerprint(new BasicAuthSecretContent(username, password));
-        } catch (Exception e) {
-            log.warn("TSP authentication: failed to compute credential fingerprint for profile '{}': {}", profile.name(), e.getMessage());
+        String candidate = computeFingerprint(username, password, profile);
+        if (candidate == null) {
             return false;
         }
 
@@ -95,18 +96,27 @@ public class BasicPasswordAuthenticator implements TspAuthenticator {
         return contextWriter.authenticateAsUser(credential.mappedUserUuid());
     }
 
+    private String computeFingerprint(String username, String password, TspProfileModel profile) {
+        try {
+            return SecretsUtil.calculateSecretContentFingerprint(new BasicAuthSecretContent(username, password));
+        } catch (JsonProcessingException | NoSuchAlgorithmException e) {
+            log.warn("TSP authentication: failed to compute credential fingerprint for profile '{}': {}", profile.name(), e.getMessage());
+            return null;
+        }
+    }
+
     private String[] decodeBasicCredentials(String authorization) {
         try {
             String encoded = authorization.substring(BASIC_PREFIX.length()).trim();
             String decoded = new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
             int separator = decoded.indexOf(':');
             if (separator < 0) {
-                return null;
+                return new String[0];
             }
             return new String[]{decoded.substring(0, separator), decoded.substring(separator + 1)};
         } catch (IllegalArgumentException e) {
             log.warn("TSP authentication: malformed Basic credentials.");
-            return null;
+            return new String[0];
         }
     }
 }

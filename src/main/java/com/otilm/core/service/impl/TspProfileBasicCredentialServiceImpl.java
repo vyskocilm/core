@@ -136,7 +136,9 @@ public class TspProfileBasicCredentialServiceImpl implements TspProfileBasicCred
             throw new AlreadyExistException("A Basic credential with username '" + request.getUsername() + "' already exists on this profile.");
         }
 
-        if (rotate || mappedUserChanged) {
+        // Vault updates the secret asynchronously - the cache is notified via SecretContentUpdatedEvent processed by TspProfileSecretEvictionListener.
+        // Evict synchronously here only on mapped-user-only change (no secret update).
+        if (mappedUserChanged) {
             credentialVerificationCache.evictBySecretUuid(credential.getSecretUuid());
         }
         evictModelCache(profile);
