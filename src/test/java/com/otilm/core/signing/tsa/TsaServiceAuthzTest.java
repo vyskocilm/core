@@ -64,7 +64,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
 
     @BeforeEach
     void stubEngineAndResolver() throws TspException {
-        lenient().when(managedTimestampEngine.process(any(), any()))
+        lenient().when(managedTimestampEngine.process(any(), any(), any()))
                 .thenReturn(TspResponse.granted(new byte[]{1, 2, 3}));
 
         lenient().when(signingProfileResolverFactory.resolve(any())).thenAnswer(invocation -> {
@@ -152,7 +152,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
                     any(),
                     org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, tspProfile.getUuid())),
                     any(), any());
-            verify(managedTimestampEngine).process(any(), any());
+            verify(managedTimestampEngine).process(any(), any(), any());
         }
 
         @Test
@@ -211,7 +211,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
 
             // then
             assertThat(response).isInstanceOf(TspResponse.Granted.class);
-            verify(managedTimestampEngine).process(any(), any());
+            verify(managedTimestampEngine).process(any(), any(), any());
         }
     }
 
@@ -235,7 +235,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
                     any(),
                     org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, linkedTspProfile.getUuid())),
                     any(), any());
-            verify(managedTimestampEngine).process(any(), any());
+            verify(managedTimestampEngine).process(any(), any(), any());
         }
 
         @Test
