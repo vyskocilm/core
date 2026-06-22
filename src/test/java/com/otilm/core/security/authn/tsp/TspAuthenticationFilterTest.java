@@ -140,7 +140,7 @@ class TspAuthenticationFilterTest {
         void returns401WithoutChallenge_whenMethodDisallowed_certOnlyProfile() throws Exception {
             // given — a client-certificate-only profile has no HTTP-level scheme to advertise: the cert is presented
             // to the TLS-terminating proxy, not via a WWW-Authenticate challenge. The response is 401, header omitted.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
             request.addHeader("Authorization", basicHeader("u", "p"));
@@ -158,7 +158,7 @@ class TspAuthenticationFilterTest {
         @Test
         void rejectsBeforeAuth_whenSigningProfileRouteHasNullTspProfileUuid() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/signingProfiles/sp1/sign");
+            setPath("/v1/protocols/tsp/signingProfiles/sp1");
             when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1"))
                     .thenReturn(Optional.empty());
 
@@ -175,7 +175,7 @@ class TspAuthenticationFilterTest {
         @Test
         void resolvesLinkedTspProfile_onSigningProfileRoute() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/signingProfiles/sp1/sign");
+            setPath("/v1/protocols/tsp/signingProfiles/sp1");
             when(signingProfileService.resolveTspProfileForSigningProfileAuthentication("sp1"))
                     .thenReturn(Optional.of(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE))));
             request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
@@ -193,7 +193,7 @@ class TspAuthenticationFilterTest {
         void resolvesAsDirectTspProfile_whenDirectNameLooksLikeSigningProfiles() throws Exception {
             // given — a single-segment direct name that happens to be "signingProfiles" must NOT be routed through the
             // indirect signing-profile resolution: there is no trailing name segment, so it is a plain direct name.
-            setPath("/v1/protocols/tsp/signingProfiles/sign");
+            setPath("/v1/protocols/tsp/signingProfiles");
             when(tspProfileService.resolveTspProfileForAuthentication("signingProfiles"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
             request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
@@ -212,7 +212,7 @@ class TspAuthenticationFilterTest {
         @Test
         void returns401WithoutAuthentication_whenDirectRouteNotFound() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenThrow(new NotFoundException("TspProfile", "p1"));
             request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
@@ -230,7 +230,7 @@ class TspAuthenticationFilterTest {
         @Test
         void advertisesBearerNotBasic_whenBearerOnlyProfile_andMethodDisallowed() throws Exception {
             // given — present Basic, which is NOT in the allowed set → 401, header must advertise Bearer (not Basic)
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
             request.addHeader("Authorization", basicHeader("u", "p"));
@@ -255,9 +255,9 @@ class TspAuthenticationFilterTest {
 
         @Test
         void isNotGated_whenMultiSegmentTspPath() throws Exception {
-            // given — a multi-segment name between the prefix and /sign must not be treated as a single profile name,
+            // given — a multi-segment name after the prefix must not be treated as a single profile name,
             // nor confused with the indirect signingProfiles route.
-            setPath("/v1/protocols/tsp/a/b/sign");
+            setPath("/v1/protocols/tsp/a/b");
 
             // when / then
             assertThat(filter.shouldNotFilter(request)).isTrue();
@@ -272,7 +272,7 @@ class TspAuthenticationFilterTest {
         @Test
         void isNotGated_whenTrailingSlashTspPath() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/p1/sign/");
+            setPath("/v1/protocols/tsp/p1/");
 
             // when / then
             assertThat(filter.shouldNotFilter(request)).isTrue();
@@ -285,7 +285,7 @@ class TspAuthenticationFilterTest {
         }
 
         @Test
-        void isNotGated_whenNonSignTspPath() throws Exception {
+        void isNotGated_whenTrailingExtraSegment() throws Exception {
             // given
             setPath("/v1/protocols/tsp/p1/verify");
 
@@ -307,7 +307,7 @@ class TspAuthenticationFilterTest {
         @Test
         void setsContextFromConnector() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
             request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
@@ -332,7 +332,7 @@ class TspAuthenticationFilterTest {
         @Test
         void decodesAndAuthenticatesByToken() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
             request.addHeader("Authorization", "Bearer the.jwt.token");
@@ -368,7 +368,7 @@ class TspAuthenticationFilterTest {
             // given
             UUID secretUuid = UUID.randomUUID();
             UUID mappedUser = UUID.randomUUID();
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
                     List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
                     List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, fingerprintOf("alice", "s3cret")))));
@@ -389,7 +389,7 @@ class TspAuthenticationFilterTest {
             // given
             UUID secretUuid = UUID.randomUUID();
             UUID mappedUser = UUID.randomUUID();
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
                     List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
                     List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, fingerprintOf("alice", "right")))));
@@ -411,7 +411,7 @@ class TspAuthenticationFilterTest {
             // given
             UUID secretUuid = UUID.randomUUID();
             UUID mappedUser = UUID.randomUUID();
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
                     List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
                     List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, mappedUser, "x"))));
@@ -430,7 +430,7 @@ class TspAuthenticationFilterTest {
         @Test
         void returns401WithoutForwarding_whenPasswordBlank() throws Exception {
             // given
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD)));
             request.addHeader("Authorization", basicHeader("alice", ""));
@@ -448,7 +448,7 @@ class TspAuthenticationFilterTest {
         void returns401_whenUsernameUnknown() throws Exception {
             // given
             UUID secretUuid = UUID.randomUUID();
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1")).thenReturn(modelWith(
                     List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
                     List.of(new TspProfileModel.BasicCredentialRef("alice", secretUuid, UUID.randomUUID(), "x"))));
@@ -466,7 +466,7 @@ class TspAuthenticationFilterTest {
         @Test
         void advertisesBasicRealm_whenBasicMethodEnabled() throws Exception {
             // given — present a Bearer token, which is NOT in the allowed set → 401, header must advertise Basic realm
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD)));
             request.addHeader("Authorization", "Bearer some.jwt");
@@ -491,7 +491,7 @@ class TspAuthenticationFilterTest {
         void failsClosed_whenClientCertificateAuthClientThrows() throws Exception {
             // given — CLIENT_CERTIFICATE profile, cert header present, but authenticateByCertificate throws.
             // The filter must catch it, return 401, and NOT continue the chain.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
             request.addHeader(CERT_HEADER_NAME, CERT_HEADER);
@@ -511,7 +511,7 @@ class TspAuthenticationFilterTest {
         void failsClosed_whenCertHeaderMalformed() throws Exception {
             // given — CLIENT_CERTIFICATE profile, but the cert header contains non-base64 content outside the PEM
             // wrapper, causing Base64.getDecoder().decode to throw IllegalArgumentException. The filter must fail closed.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.CLIENT_CERTIFICATE)));
             request.addHeader(CERT_HEADER_NAME, "!!not-valid-base64!!");
@@ -528,7 +528,7 @@ class TspAuthenticationFilterTest {
         @Test
         void failsClosed_whenBearerDecodeReturnsNull() throws Exception {
             // given — BEARER_TOKEN profile, jwtDecoder.decode returns null → filter must return 401, not continue chain.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
             request.addHeader("Authorization", "Bearer the.jwt.token");
@@ -547,7 +547,7 @@ class TspAuthenticationFilterTest {
         @Test
         void failsClosed_whenBearerDecodeThrows() throws Exception {
             // given — BEARER_TOKEN profile, jwtDecoder.decode throws a RuntimeException → filter must catch and 401.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BEARER_TOKEN)));
             request.addHeader("Authorization", "Bearer bad.token");
@@ -568,7 +568,7 @@ class TspAuthenticationFilterTest {
         void failsClosedWithoutCallingConnector_whenBasicCredentialsHaveNoColon() throws Exception {
             // given — BASIC_PASSWORD profile, Authorization is "Basic <base64 of a string with no colon>".
             // decodeBasicCredentials returns null → filter must return 401 without ever consulting secretService.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
                             List.of(new TspProfileModel.BasicCredentialRef("alice", UUID.randomUUID(), UUID.randomUUID(), "x"))));
@@ -589,7 +589,7 @@ class TspAuthenticationFilterTest {
         void failsClosedWithoutCallingConnector_whenBasicInvalidBase64() throws Exception {
             // given — BASIC_PASSWORD profile, Authorization contains invalid Base64 — decodeBasicCredentials catches
             // IllegalArgumentException and returns null → filter must return 401 without consulting secretService.
-            setPath("/v1/protocols/tsp/p1/sign");
+            setPath("/v1/protocols/tsp/p1");
             when(tspProfileService.resolveTspProfileForAuthentication("p1"))
                     .thenReturn(modelWith(List.of(TspAuthenticationMethod.BASIC_PASSWORD), UUID.randomUUID(),
                             List.of(new TspProfileModel.BasicCredentialRef("alice", UUID.randomUUID(), UUID.randomUUID(), "x"))));
