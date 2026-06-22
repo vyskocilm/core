@@ -7,8 +7,8 @@ import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.UUID;
-
+import static com.otilm.core.util.builders.TspProfileBasicCredentialBuilder.aTspProfileBasicCredential;
+import static com.otilm.core.util.builders.TspProfileEntityBuilder.aTspProfile;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TspProfileBasicCredentialPersistenceTest extends BaseSpringBootTest {
@@ -23,14 +23,8 @@ class TspProfileBasicCredentialPersistenceTest extends BaseSpringBootTest {
     @Transactional
     void cascadesPersist_andRemovesOrphans() {
         // given
-        TspProfile profile = new TspProfile();
-        profile.setName("cred-profile");
-
-        TspProfileBasicCredential cred = new TspProfileBasicCredential();
-        cred.setUsername("svc");
-        cred.setSecretUuid(UUID.randomUUID());
-        cred.setMappedUserUuid(UUID.randomUUID());
-        cred.setTspProfile(profile);
+        TspProfile profile = aTspProfile().withName("cred-profile").build();
+        TspProfileBasicCredential cred = aTspProfileBasicCredential().withTspProfile(profile).build();
         profile.getBasicCredentials().add(cred);
 
         // when — cascade persist; flush + clear so the reload crosses the persistence-context boundary
