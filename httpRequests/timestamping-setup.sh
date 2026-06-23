@@ -36,7 +36,7 @@ ILM_HOST="http://localhost:8080"
 #   header - send the admin certificate in the ssl-client-cert header (local instances).
 #   mtls   - present an admin PKCS12 as a real TLS client certificate (remote HTTPS instances).
 AUTH_MODE="header"
-CLIENT_CERT_PEM=""
+CLIENT_CERT_PEM="/home/lukas/dev/work/3key/czertainly/CZERTAINLY-Core/dev/client_cert.pem"
 CLIENT_P12_BUNDLE=""        # mtls mode:   admin client PKCS12 bundle
 CLIENT_P12_PASSPHRASE=""
 INSECURE_TLS="false"        # mtls mode:   skip server TLS verification (curl -k)
@@ -47,10 +47,10 @@ PORT_EJBCA="8210"
 PORT_CRYPTO_PROVIDER="8230"
 PORT_FORMATTER="8270"
 
-PKCS12_BUNDLE=""
+PKCS12_BUNDLE="/home/lukas/dev/work/3key/czertainly/CZERTAINLY-Core/dev/ejbca.3key.company - Ivo Raisr - 00000000.p12"
 PKCS12_PASSWORD="00000000"
 TOKEN_PASSWORD=""          # defaults to PKCS12_PASSWORD when empty
-CERTIFICATE_DN=""
+CERTIFICATE_DN="lukas-dev-tsa-50"
 
 EJBCA_URL="https://ejbca.3key.company/ejbca/ejbcaws/ejbcaws?wsdl"
 EJBCA_EE_PROFILE="DemoTSAEndEntityProfile"
@@ -174,9 +174,9 @@ Connector options (defaults: localhost, ports 8200/8210/8230/8270):
 Vault / Basic credential options:
   --vault-instance-name NAME  Vault instance name (created if absent; default: vault)
   --vault-profile-name NAME   Vault profile name (created if absent; default: timestamping)
-  --mapped-user-username NAME Username of the mapped user for Basic credentials (default: frantapepa)
-  --tsp-credential-username NAME  Basic credential username (default: tsa-basic)
-  --tsp-credential-password PASS  Basic credential password (default: tsa-basic-secret)
+  --mapped-user-username NAME Username of the mapped user for Basic credentials (default: f.jednicka)
+  --tsp-credential-username NAME  Basic credential username (default: f.jednicka)
+  --tsp-credential-password PASS  Basic credential password (default: your-strong-password)
 
 Credential/token options:
   --pkcs12-password PASS      PKCS12 bundle password     (default: 00000000)
@@ -956,28 +956,22 @@ setup_mapped_user() {
 }
 
 # --- Step 8b: Timestamping role ----------------------------------------------
-# Serving one RFC 3161 timestamp request runs SIX OPA authorization checks as the calling user,
+# Serving one RFC 3161 timestamp request runs OPA authorization checks as the calling user,
 # scattered across the request path (TsaServiceImpl -> resolver -> CryptographicOperationServiceImpl):
-#   tspProfiles/timestamp   - PermissionEvaluator.tspProfileTimestamping (entry gate)
-#   tspProfiles/detail      - TspProfileService.getTspProfile
-#   signingProfiles/detail  - SigningProfileService.getSigningProfileModel
+#   tspProfiles/timestamp   - AuthPermissionEvaluationServiceImpl.tspProfileTimestamping (entry gate)
+#   tspProfiles/detail      - TspProfileServiceImpl.getTspProfile
+#   signingProfiles/detail  - SigningProfileServiceImpl.getSigningProfileModel
 #   keys/sign               - CryptographicOperationServiceImpl.signDataWithoutEventHistory (the actual sign)
 #   tokens/detail           - same method, parentResource on the sign annotation
-#   tokenProfiles/detail    - same method, PermissionEvaluator.tokenProfile
+#   tokenProfiles/detail    - tokenProfile permission evaluation
 # A freshly created user has none of these, so without this step timestamp requests are rejected
-# (often deep in the chain, not at the gate). Granted at the resource level via a dedicated role.
+# (often deep in the chain, not at the gate).
+#
+# This function only creates the role and attaches it to the user. The permissions are object-scoped
+# to the concrete TSP/signing profiles, token and token profile, which only exist after the TSA sets
+# are built -- so they are applied later by grant_timestamping_permissions().
 setup_timestamping_role() {
   local _resp _existing _list
-  local perm_body='{
-    "allowAllResources": false,
-    "resources": [
-      {"name":"tspProfiles",     "allowAllActions":false, "actions":["timestamp","detail"], "objects":[]},
-      {"name":"signingProfiles", "allowAllActions":false, "actions":["detail"],             "objects":[]},
-      {"name":"keys",            "allowAllActions":false, "actions":["sign"],               "objects":[]},
-      {"name":"tokens",          "allowAllActions":false, "actions":["detail"],             "objects":[]},
-      {"name":"tokenProfiles",   "allowAllActions":false, "actions":["detail"],             "objects":[]}
-    ]
-  }'
 
   _list=$(ilm_curl GET /v1/roles)
   _existing=$(find_named_item "$_list" "$MAPPED_USER_ROLE_NAME")
@@ -993,11 +987,6 @@ setup_timestamping_role() {
     ok "role  $MAPPED_USER_ROLE_UUID"
   fi
 
-  # savePermissions replaces the role's permission set, so this is safe to re-apply on every run.
-  log "Granting timestamping permissions to role '${MAPPED_USER_ROLE_NAME}'..."
-  ilm_curl POST "/v1/roles/${MAPPED_USER_ROLE_UUID}/permissions" -d "$perm_body" >/dev/null
-  ok "permissions granted"
-
   if [[ "$(ilm_curl GET "/v1/users/${MAPPED_USER_UUID}/roles" \
         | jq -r --arg u "$MAPPED_USER_ROLE_UUID" 'any(.[]; .uuid==$u)')" == "true" ]]; then
     ok "role already attached to user '${MAPPED_USER_USERNAME}'"
@@ -1006,6 +995,59 @@ setup_timestamping_role() {
     ilm_curl PUT "/v1/users/${MAPPED_USER_UUID}/roles/${MAPPED_USER_ROLE_UUID}" >/dev/null
     ok "role attached"
   fi
+}
+
+# --- Step 12: Object-scoped timestamping permissions -------------------------
+# Applied after both TSA sets exist, so every grant targets concrete object UUIDs rather than the
+# whole resource. The OPA method policy (CZERTAINLY-Auth-OPA-Policies/policies/method_policy.rego)
+# honors object-scoped grants for BOTH request shapes on the timestamp path:
+#   - checks that carry the object UUID (tspProfiles/timestamp via SecuredUUID; tokens/detail via the
+#     SecuredParentUUID token instance) are matched by the "ActionAllowedForSpecificObject" rule;
+#   - name-based checks that carry NO uuid (tspProfiles/detail and signingProfiles/detail load by
+#     String name) are matched by the "ActionAllowedForSomeObjects" rule, which grants when the action
+#     is allowed for some object under the resource.
+# NOTE on keys/sign: the Auth service rejects object-scoped permissions on the 'keys' resource
+# (objectAccess=false in the Auth seed -> "Resource 'Keys' does not support object access permissions"),
+# so keys/sign must be granted resource-wide as an action, not against any object uuid.
+# savePermissions replaces the role's whole permission set, so this is safe to re-apply.
+grant_timestamping_permissions() {
+  local perm_body
+  local nq_tsp_name="${TSP_PROFILE_NAME_BASE}-non-qualified"
+  local q_tsp_name="${TSP_PROFILE_NAME_BASE}-qualified"
+  local nq_sp_name="${SIGNING_PROFILE_NAME_BASE}-non-qualified"
+  local q_sp_name="${SIGNING_PROFILE_NAME_BASE}-qualified"
+
+  perm_body=$(jq -n \
+    --arg tspNqUuid "$TSP_PROFILE_UUID_NQ" --arg tspNqName "$nq_tsp_name" \
+    --arg tspQUuid  "$TSP_PROFILE_UUID_Q"  --arg tspQName  "$q_tsp_name" \
+    --arg spNqUuid  "$SIGNING_PROFILE_UUID_NQ" --arg spNqName "$nq_sp_name" \
+    --arg spQUuid   "$SIGNING_PROFILE_UUID_Q"  --arg spQName  "$q_sp_name" \
+    --arg tokenUuid "$TOKEN_UUID"          --arg tokenName "$TOKEN_NAME" \
+    --arg tpUuid    "$TOKEN_PROFILE_UUID"  --arg tpName    "$TOKEN_PROFILE_NAME" \
+    '{
+      allowAllResources: false,
+      resources: [
+        {name:"tspProfiles", allowAllActions:false, actions:[], objects:[
+          {uuid:$tspNqUuid, name:$tspNqName, allow:["timestamp","detail"], deny:[]},
+          {uuid:$tspQUuid,  name:$tspQName,  allow:["timestamp","detail"], deny:[]}
+        ]},
+        {name:"signingProfiles", allowAllActions:false, actions:[], objects:[
+          {uuid:$spNqUuid, name:$spNqName, allow:["detail"], deny:[]},
+          {uuid:$spQUuid,  name:$spQName,  allow:["detail"], deny:[]}
+        ]},
+        {name:"keys", allowAllActions:false, actions:["sign"], objects:[]},
+        {name:"tokens", allowAllActions:false, actions:[], objects:[
+          {uuid:$tokenUuid, name:$tokenName, allow:["detail"], deny:[]}
+        ]},
+        {name:"tokenProfiles", allowAllActions:false, actions:[], objects:[
+          {uuid:$tpUuid, name:$tpName, allow:["detail"], deny:[]}
+        ]}
+      ]
+    }')
+
+  log "Granting object-scoped timestamping permissions to role '${MAPPED_USER_ROLE_NAME}'..."
+  ilm_curl POST "/v1/roles/${MAPPED_USER_ROLE_UUID}/permissions" -d "$perm_body" >/dev/null
+  ok "object-scoped permissions granted"
 }
 
 # --- Step 7: Key pair ---------------------------------------------------------
@@ -1700,10 +1742,15 @@ setup_tsa_set() {
     ra_uuid=$(uuid_of_named "$_list" "$ra_name")
     _list=$(list_paginated /v1/tspProfiles/list)
     tsp_uuid=$(uuid_of_named "$_list" "$tsp_name")
+    # A reused set with no matching TSP profile is a half-configured state: grant_timestamping_permissions
+    # would otherwise emit a tspProfiles grant keyed to an empty UUID, so the timestamp right is silently
+    # never granted and only surfaces as an OPA rejection at request time. Fail fast instead.
+    [[ -z "$tsp_uuid" ]] && die "Reused Signing Profile '${sp_name}' ($sp_uuid) has no matching TSP profile '${tsp_name}'; resolve the inconsistency (recreate or rename the TSP profile) and re-run"
     # The detail DTO nests the cert as signingScheme.certificate (CertificateSimpleDto), not certificateUuid.
     sp_details=$(ilm_curl GET "/v1/signingProfiles/${sp_uuid}")
     cert_uuid=$(echo "$sp_details" | jq -r '.signingScheme.certificate.uuid // empty')
-    [[ -n "$tsp_uuid" ]] && setup_tsp_basic_credential "$tsp_uuid"
+    [[ -z "$cert_uuid" ]] && die "Reused Signing Profile '${sp_name}' ($sp_uuid) has no signing certificate; resolve the inconsistency and re-run"
+    setup_tsp_basic_credential "$tsp_uuid"
   else
     setup_key_pair    "$key_name" key_uuid priv_uuid
     setup_ra_profile  "$ra_name" "$cert_profile" ra_uuid
@@ -1751,7 +1798,7 @@ Setup complete. Created resources:
     vault-instance  $VAULT_INSTANCE_NAME            $VAULT_INSTANCE_UUID
     vault-profile   $VAULT_PROFILE_NAME             $VAULT_PROFILE_UUID
     mapped-user     $MAPPED_USER_USERNAME          $MAPPED_USER_UUID
-    role            $MAPPED_USER_ROLE_NAME         $MAPPED_USER_ROLE_UUID  (tspProfiles, signingProfiles, keys, tokens, tokenProfiles)
+    role            $MAPPED_USER_ROLE_NAME         $MAPPED_USER_ROLE_UUID  (object-scoped: tspProfiles, signingProfiles, keys, tokens, tokenProfiles)
 
   TSA non-qualified set:
     key             $nq_key_name    $KEY_UUID_NQ
@@ -1789,6 +1836,8 @@ main() {
 
   setup_tsa_set "non-qualified" "$EJBCA_CERT_PROFILE"           "$POLICY_ID_NON_QUALIFIED" ""                   NQ
   setup_tsa_set "qualified"     "$EJBCA_CERT_PROFILE_QUALIFIED" "$POLICY_ID_QUALIFIED"     "$TIME_QUALITY_UUID" Q
+
+  grant_timestamping_permissions
 
   print_summary
 }
