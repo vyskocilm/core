@@ -36,7 +36,7 @@ ILM_HOST="http://localhost:8080"
 #   header - send the admin certificate in the ssl-client-cert header (local instances).
 #   mtls   - present an admin PKCS12 as a real TLS client certificate (remote HTTPS instances).
 AUTH_MODE="header"
-CLIENT_CERT_PEM="/home/lukas/dev/work/3key/czertainly/CZERTAINLY-Core/dev/client_cert.pem"
+CLIENT_CERT_PEM=""
 CLIENT_P12_BUNDLE=""        # mtls mode:   admin client PKCS12 bundle
 CLIENT_P12_PASSPHRASE=""
 INSECURE_TLS="false"        # mtls mode:   skip server TLS verification (curl -k)
@@ -47,10 +47,10 @@ PORT_EJBCA="8210"
 PORT_CRYPTO_PROVIDER="8230"
 PORT_FORMATTER="8270"
 
-PKCS12_BUNDLE="/home/lukas/dev/work/3key/czertainly/CZERTAINLY-Core/dev/ejbca.3key.company - Ivo Raisr - 00000000.p12"
+PKCS12_BUNDLE=""
 PKCS12_PASSWORD="00000000"
 TOKEN_PASSWORD=""          # defaults to PKCS12_PASSWORD when empty
-CERTIFICATE_DN="lukas-dev-tsa-44"
+CERTIFICATE_DN=""
 
 EJBCA_URL="https://ejbca.3key.company/ejbca/ejbcaws/ejbcaws?wsdl"
 EJBCA_EE_PROFILE="DemoTSAEndEntityProfile"
