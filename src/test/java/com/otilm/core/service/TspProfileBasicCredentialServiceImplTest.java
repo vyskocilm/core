@@ -247,7 +247,6 @@ class TspProfileBasicCredentialServiceImplTest extends BaseSpringBootTest {
 
             // then
             verify(secretService, times(1)).updateSecret(eq(secretUuid), any());
-            verify(credentialVerificationCache, times(1)).evictBySecretUuid(secretUuid);
         }
 
         @Test

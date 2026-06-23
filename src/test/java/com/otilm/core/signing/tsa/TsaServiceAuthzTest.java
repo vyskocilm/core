@@ -116,19 +116,19 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
         signingProfileRepository.saveAndFlush(signingProfile);
     }
 
-    /** Deny the object-level OPA check only for the given TSP profile UUID + TSP_SIGN action. */
-    private void denyTspSignForObject(java.util.UUID forbiddenUuid) {
+    /** Deny the object-level OPA check only for the given TSP profile UUID + TIMESTAMP action. */
+    private void denyTimestampForObject(java.util.UUID forbiddenUuid) {
         OpaResourceAccessResult denied = new OpaResourceAccessResult();
         denied.setAuthorized(false);
-        when(opaClient.checkResourceAccess(any(), org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, forbiddenUuid)), any(), any()))
+        when(opaClient.checkResourceAccess(any(), org.mockito.ArgumentMatchers.argThat(req -> isTimestampFor(req, forbiddenUuid)), any(), any()))
                 .thenReturn(denied);
     }
 
-    private static boolean isTspSignFor(OpaRequestedResource req, java.util.UUID uuid) {
+    private static boolean isTimestampFor(OpaRequestedResource req, java.util.UUID uuid) {
         return req != null
                 && req.getProperties() != null
                 && Resource.TSP_PROFILE.getCode().equals(req.getProperties().get("name"))
-                && ResourceAction.TSP_SIGN.getCode().equals(req.getProperties().get("action"))
+                && ResourceAction.TIMESTAMP.getCode().equals(req.getProperties().get("action"))
                 && req.getObjectUUIDs() != null
                 && req.getObjectUUIDs().contains(uuid.toString());
     }
@@ -139,7 +139,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
     class ProcessTspRequestForTspProfile {
 
         @Test
-        void authorizesObjectLevel_withTspProfileUuid_andTspSignAction() throws Exception {
+        void authorizesObjectLevel_withTspProfileUuid_andTimestampAction() throws Exception {
             // given
             SigningProfile signingProfile = createTimestampingSigningProfile("sp-authz", true);
             TspProfile tspProfile = createTspProfileFor("tsp-authz", true, signingProfile);
@@ -150,7 +150,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
             // then
             verify(opaClient, atLeastOnce()).checkResourceAccess(
                     any(),
-                    org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, tspProfile.getUuid())),
+                    org.mockito.ArgumentMatchers.argThat(req -> isTimestampFor(req, tspProfile.getUuid())),
                     any(), any());
             verify(managedTimestampEngine).process(any(), any(), any());
         }
@@ -163,7 +163,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
             TspProfile tspProfileA = createTspProfileFor("tsp-a", true, signingProfileA);
             createTspProfileFor("tsp-b", true, signingProfileB);
 
-            denyTspSignForObject(tspProfileA.getUuid());
+            denyTimestampForObject(tspProfileA.getUuid());
 
             // when / then
             assertThatThrownBy(() -> tsaService.processTspRequestForTspProfile("tsp-a", aTspRequest().build()))
@@ -221,7 +221,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
     class ProcessTspRequestForSigningProfile {
 
         @Test
-        void authorizesAgainstLinkedTspProfileUuid_andTspSignAction() throws Exception {
+        void authorizesAgainstLinkedTspProfileUuid_andTimestampAction() throws Exception {
             // given
             SigningProfile signingProfile = createTimestampingSigningProfile("sp-indirect-authz", true);
             TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-authz", true, signingProfile);
@@ -233,7 +233,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
             // then
             verify(opaClient, atLeastOnce()).checkResourceAccess(
                     any(),
-                    org.mockito.ArgumentMatchers.argThat(req -> isTspSignFor(req, linkedTspProfile.getUuid())),
+                    org.mockito.ArgumentMatchers.argThat(req -> isTimestampFor(req, linkedTspProfile.getUuid())),
                     any(), any());
             verify(managedTimestampEngine).process(any(), any(), any());
         }
@@ -245,7 +245,7 @@ class TsaServiceAuthzTest extends BaseSpringBootTest {
             TspProfile linkedTspProfile = createTspProfileFor("tsp-indirect-denied", true, signingProfile);
             linkTspProfile(signingProfile, linkedTspProfile);
 
-            denyTspSignForObject(linkedTspProfile.getUuid());
+            denyTimestampForObject(linkedTspProfile.getUuid());
 
             // when / then
             assertThatThrownBy(() -> tsaService.processTspRequestForSigningProfile("sp-indirect-denied", aTspRequest().build()))
