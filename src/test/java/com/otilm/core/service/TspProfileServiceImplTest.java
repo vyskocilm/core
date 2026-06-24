@@ -65,7 +65,10 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
     private static final String BASE_URL = "http://localhost";
 
     @Autowired
-    private TspProfileService tspService;
+    private TspProfileExternalService tspService;
+
+    @Autowired
+    private TspProfileInternalService tspInternalService;
 
     @Autowired
     private ResourceExternalService resourceService;
@@ -235,7 +238,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Test
     void testGetTspProfileEntity_returnsCorrectEntity() throws NotFoundException {
-        TspProfile entity = tspService.getTspProfileEntity(savedTspProfile.getSecuredUuid());
+        TspProfile entity = tspInternalService.getTspProfileEntity(savedTspProfile.getSecuredUuid());
 
         assertNotNull(entity);
         assertEquals(savedTspProfile.getUuid(), entity.getUuid());
@@ -245,7 +248,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
     @Test
     void testGetTspProfileEntity_notFound() {
         assertThrows(NotFoundException.class,
-                () -> tspService.getTspProfileEntity(
+                () -> tspInternalService.getTspProfileEntity(
                         SecuredUUID.fromString("00000000-0000-0000-0000-000000000001")));
     }
 
@@ -255,7 +258,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Test
     void testFindAllNames_returnsExistingNames() {
-        List<String> names = tspService.findAllNames();
+        List<String> names = tspInternalService.findAllNames();
 
         assertNotNull(names);
         assertEquals(1, names.size());
@@ -268,7 +271,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
         second.setName("second-tsp-profile");
         tspRepository.save(second);
 
-        List<String> names = tspService.findAllNames();
+        List<String> names = tspInternalService.findAllNames();
 
         assertEquals(2, names.size());
         assertTrue(names.contains(savedTspProfile.getName()));
@@ -279,7 +282,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
     void testFindAllNames_emptyWhenNoneExist() {
         tspRepository.delete(savedTspProfile);
 
-        List<String> names = tspService.findAllNames();
+        List<String> names = tspInternalService.findAllNames();
 
         assertNotNull(names);
         assertTrue(names.isEmpty());
