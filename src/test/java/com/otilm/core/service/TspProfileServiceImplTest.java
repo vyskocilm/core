@@ -641,7 +641,7 @@ class TspProfileServiceImplTest extends BaseSpringBootTest {
 
     @Test
     void resolveForAuthentication_returnsModelWithoutAuthorization() throws Exception {
-        TspProfileModel model = tspService.resolveTspProfileForAuthentication(savedTspProfile.getName());
+        TspProfileModel model = tspInternalService.resolveTspProfileForAuthentication(savedTspProfile.getName());
         assertEquals(savedTspProfile.getName(), model.name());
     }
 
